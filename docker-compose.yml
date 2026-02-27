@@ -1,0 +1,16 @@
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./app:/app/app
+      - uploads:/app/uploads
+      - output:/app/output
+    environment:
+      - FLASK_DEBUG=1
+      - MAX_UPLOAD_SIZE=500
+
+volumes:
+  uploads:
+  output:
