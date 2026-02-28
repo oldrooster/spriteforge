@@ -726,6 +726,143 @@ footer {
     border-color: var(--accent);
 }
 
+/* Preview background options */
+.preview-bg-options {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.preview-bg-btn {
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 2px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s;
+}
+
+.preview-bg-btn.active {
+    border-color: var(--accent);
+}
+
+.preview-bg-btn:hover {
+    border-color: var(--accent-hover);
+}
+
+.color-swatch {
+    width: 100%;
+    height: 100%;
+    border-radius: 2px;
+    display: block;
+}
+
+.checkerboard-swatch {
+    width: 100%;
+    height: 100%;
+    border-radius: 2px;
+    display: block;
+    background: repeating-conic-gradient(#7B2D8E 0% 25%, #9B4DBA 0% 50%) 0 0 / 10px 10px;
+}
+
+#preview-bg-custom {
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 1px;
+    background: var(--bg-secondary);
+}
+
+/* Canvas zoom container */
+.canvas-zoom-container {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: auto;
+    max-height: 500px;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    position: relative;
+}
+
+.canvas-zoom-container canvas {
+    image-rendering: pixelated;
+    transform-origin: 0 0;
+}
+
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.zoom-controls .btn-small {
+    min-width: 32px;
+    justify-content: center;
+}
+
+#flood-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* Eraser tool */
+.eraser-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.eraser-size-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.eraser-slider {
+    flex: 1;
+    min-width: 80px;
+}
+
+#eraser-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.eraser-active canvas {
+    cursor: none !important;
+}
+
+.eraser-cursor {
+    position: fixed;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
+    display: none;
+}
+
+.eraser-active .eraser-cursor {
+    display: block;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .extract-layout, .transparency-layout {

@@ -1,13 +1,18 @@
 # Sprite Forge
 
-An AI Sprite generator for creating game assets. Extract sprite frames from video, preview animations, and export transparent PNGs ready for your game engine.
+An AI Sprite generator for creating game assets. Extract sprite frames from video, preview animations, apply transparency, and export PNGs ready for your game engine.
 
 ## Features
 
-- **Video Upload** - Upload MP4, WebM, MOV, AVI, or MKV video files
-- **Frame Extraction** - Select time range, resolution, and frame count to extract evenly-spaced frames
-- **Animation Preview** - Preview extracted frames as an animation with adjustable speed
-- **Background Transparency** - Remove background colors with tolerance control and eyedropper tool
+- **Video Upload** - Upload MP4, WebM, MOV, AVI, or MKV video files via drag-and-drop
+- **Crop & Extract** - Drag a crop box on the video to select a sprite region, set time range and frame count
+- **Animation Preview** - Preview extracted frames as an animation with adjustable speed and filmstrip view
+- **Background Transparency**
+  - Color-based removal with tolerance and edge-only mode (preserves interior pixels like eyes)
+  - AI-powered background removal using rembg (u2net)
+  - Manual brush eraser and flood fill for touch-up corrections
+  - Zoom up to 8x for fine detail work
+- **Configurable Preview** - Switch preview background between checkerboard, solid colors, or custom color
 - **Export** - Download all frames as a ZIP of transparent PNGs
 
 ## Quick Start
@@ -18,19 +23,22 @@ docker-compose up --build
 
 Open [http://localhost:5000](http://localhost:5000) in your browser.
 
+> The first build downloads the u2net AI model (~176MB) and may take a few minutes. Subsequent builds use the cached layer.
+
 ## Workflow
 
 1. **Upload** a video file (drag-and-drop or click to browse)
-2. **Configure extraction** - set output resolution (32x32 to 512x512 or custom), time range, and number of frames
-3. **Preview** the animation - adjust frame delay to get the right speed
-4. **Apply transparency** - pick the background color to remove (use the eyedropper or color picker), adjust tolerance, and verify on the purple checkerboard background
+2. **Configure extraction** - drag the crop box on the video to frame your sprite, set time range and number of frames, choose output resolution
+3. **Preview** the animation - adjust frame delay, scrub through frames
+4. **Apply transparency** - use color removal (with eyedropper), AI removal, or manual eraser/flood fill to clean up backgrounds
 5. **Download** all frames as a ZIP file
 
 ## Tech Stack
 
 - Python 3.12 / Flask
 - FFmpeg for video processing
-- Pillow + NumPy for image processing
+- Pillow + NumPy + SciPy for image processing
+- rembg (u2net) for AI background removal
 - Vanilla HTML/CSS/JS frontend
 - Docker
 
@@ -48,6 +56,8 @@ docker-compose logs -f
 # Stop
 docker-compose down
 ```
+
+See [architecture.md](architecture.md) for detailed technical documentation.
 
 ## Configuration
 

@@ -3,7 +3,7 @@ import uuid
 
 from flask import Blueprint, current_app, jsonify, request
 
-from app.services.image import apply_transparency
+from app.services.image import apply_rembg, apply_transparency
 from app.services.video import extract_frames
 
 extract_bp = Blueprint('extract', __name__)
@@ -90,6 +90,78 @@ def transparency():
         src = os.path.join(original_dir, frame_name)
         dst = os.path.join(transparent_dir, frame_name)
         apply_transparency(src, dst, tuple(color), tolerance, edges_only=edges_only)
+
+    frame_urls = [f'/api/frames/{session_id}/transparent/{f}' for f in frames]
+
+    return jsonify({
+        'session_id': session_id,
+        'frames': frame_urls,
+        'count': len(frames),
+    })
+
+
+@extract_bp.route('/save-frame', methods=['POST'])
+def save_frame():
+    session_id = request.form.get('session_id')
+    frame_index = request.form.get('frame_index')
+    image = request.files.get('image')
+
+    if not session_id or frame_index is None or not image:
+        return jsonify({'error': 'session_id, frame_index, and image required'}), 400
+
+    frame_index = int(frame_index)
+    output_base = current_app.config['OUTPUT_FOLDER']
+
+    transparent_dir = os.path.join(output_base, session_id, 'transparent')
+    original_dir = os.path.join(output_base, session_id, 'original')
+
+    if os.path.isdir(transparent_dir):
+        frame_dir = transparent_dir
+    elif os.path.isdir(original_dir):
+        # First manual edit without prior transparency - copy originals to transparent dir
+        import shutil
+        os.makedirs(transparent_dir, exist_ok=True)
+        for f in sorted(os.listdir(original_dir)):
+            if f.endswith('.png'):
+                shutil.copy2(os.path.join(original_dir, f), os.path.join(transparent_dir, f))
+        frame_dir = transparent_dir
+    else:
+        return jsonify({'error': 'Session not found'}), 404
+
+    frames = sorted(f for f in os.listdir(frame_dir) if f.endswith('.png'))
+    if frame_index < 0 or frame_index >= len(frames):
+        return jsonify({'error': 'Invalid frame index'}), 400
+
+    dst = os.path.join(frame_dir, frames[frame_index])
+    image.save(dst)
+
+    return jsonify({'ok': True})
+
+
+@extract_bp.route('/rembg', methods=['POST'])
+def rembg_remove():
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'JSON body required'}), 400
+
+    session_id = data.get('session_id')
+    if not session_id:
+        return jsonify({'error': 'session_id required'}), 400
+
+    output_base = current_app.config['OUTPUT_FOLDER']
+    original_dir = os.path.join(output_base, session_id, 'original')
+    transparent_dir = os.path.join(output_base, session_id, 'transparent')
+
+    if not os.path.isdir(original_dir):
+        return jsonify({'error': 'Session not found'}), 404
+
+    os.makedirs(transparent_dir, exist_ok=True)
+
+    frames = sorted(f for f in os.listdir(original_dir) if f.endswith('.png'))
+    for frame_name in frames:
+        src = os.path.join(original_dir, frame_name)
+        dst = os.path.join(transparent_dir, frame_name)
+        apply_rembg(src, dst)
 
     frame_urls = [f'/api/frames/{session_id}/transparent/{f}' for f in frames]
 

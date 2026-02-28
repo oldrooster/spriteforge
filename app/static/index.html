@@ -184,7 +184,7 @@
             <h2>Background Transparency</h2>
             <div class="transparency-layout">
                 <div class="transparency-preview">
-                    <div class="canvas-wrapper checkerboard">
+                    <div class="canvas-zoom-container" id="canvas-zoom-container">
                         <canvas id="transparency-canvas"></canvas>
                     </div>
                     <div class="preview-controls">
@@ -193,8 +193,30 @@
                         <span id="trans-frame-indicator">Frame: 0 / 0</span>
                     </div>
                     <div class="setting-group">
+                        <label>Frame: <strong id="trans-frame-display">1</strong></label>
+                        <input type="range" id="trans-frame-slider" min="0" max="0" value="0" class="slider">
+                    </div>
+                    <div class="setting-group">
                         <label>Delay: <strong id="trans-delay-display">100</strong> ms</label>
                         <input type="range" id="trans-delay-slider" min="50" max="500" value="100" step="10" class="slider">
+                    </div>
+                    <div class="setting-group">
+                        <label>Preview Background</label>
+                        <div class="preview-bg-options">
+                            <button class="preview-bg-btn active" data-bg="checkerboard" title="Checkerboard">
+                                <span class="checkerboard-swatch"></span>
+                            </button>
+                            <button class="preview-bg-btn" data-bg="#000000" title="Black">
+                                <span class="color-swatch" style="background:#000"></span>
+                            </button>
+                            <button class="preview-bg-btn" data-bg="#ffffff" title="White">
+                                <span class="color-swatch" style="background:#fff"></span>
+                            </button>
+                            <button class="preview-bg-btn" data-bg="#00ff00" title="Green screen">
+                                <span class="color-swatch" style="background:#0f0"></span>
+                            </button>
+                            <input type="color" id="preview-bg-custom" value="#7B2D8E" title="Custom color">
+                        </div>
                     </div>
                 </div>
                 <div class="transparency-settings">
@@ -218,11 +240,41 @@
                         <span class="hint">When enabled, only removes background connected to image edges. Keeps interior pixels like eyes intact.</span>
                     </div>
                     <div class="transparency-actions">
-                        <button id="apply-transparency-btn" class="btn btn-primary">Apply Transparency</button>
+                        <button id="apply-transparency-btn" class="btn btn-primary">Apply Color Removal</button>
                         <button id="reset-transparency-btn" class="btn btn-secondary">Reset</button>
                     </div>
                     <div id="transparency-progress" class="progress-bar" hidden>
                         <div class="progress-fill indeterminate"></div>
+                    </div>
+                    <hr>
+                    <div class="setting-group">
+                        <label>AI Background Removal</label>
+                        <span class="hint">Uses rembg (u2net) to automatically detect and remove backgrounds. Works well for sprites with distinct subjects.</span>
+                        <button id="rembg-btn" class="btn btn-primary" style="margin-top: 8px; width: 100%;">Remove Background (AI)</button>
+                        <div id="rembg-progress" class="progress-bar" hidden>
+                            <div class="progress-fill indeterminate"></div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="setting-group">
+                        <label>Manual Touch-up</label>
+                        <span class="hint">Paint to erase background spots. Right-click to restore. Use flood fill for large areas.</span>
+                        <div class="eraser-controls">
+                            <button id="eraser-btn" class="btn btn-secondary btn-small">Brush</button>
+                            <button id="flood-btn" class="btn btn-secondary btn-small">Flood Fill</button>
+                            <label class="eraser-size-label">Size: <strong id="eraser-size-display">10</strong>px</label>
+                            <input type="range" id="eraser-size-slider" min="1" max="50" value="10" class="slider eraser-slider">
+                        </div>
+                        <div class="eraser-controls">
+                            <label class="eraser-size-label">Fill tolerance: <strong id="flood-tolerance-display">30</strong></label>
+                            <input type="range" id="flood-tolerance-slider" min="0" max="100" value="30" class="slider eraser-slider">
+                        </div>
+                        <div class="zoom-controls">
+                            <button id="zoom-in-btn" class="btn btn-secondary btn-small" title="Zoom in">+</button>
+                            <button id="zoom-out-btn" class="btn btn-secondary btn-small" title="Zoom out">&minus;</button>
+                            <button id="zoom-reset-btn" class="btn btn-secondary btn-small" title="Reset zoom">Fit</button>
+                            <span id="zoom-display" class="eraser-size-label">100%</span>
+                        </div>
                     </div>
                     <hr>
                     <button id="download-btn" class="btn btn-accent">Download ZIP</button>

@@ -59,3 +59,10 @@ def apply_transparency(src_path, dst_path, target_color, tolerance, edges_only=T
         data[mask_edge, 3] = np.minimum(edge_alpha, data[mask_edge, 3])
 
     Image.fromarray(data.astype(np.uint8)).save(dst_path, 'PNG')
+
+
+def apply_rembg(src_path, dst_path):
+    from rembg import remove
+    img = Image.open(src_path)
+    result = remove(img)
+    result.save(dst_path, 'PNG')
