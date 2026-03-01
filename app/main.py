@@ -19,7 +19,11 @@ def index():
 from app.routes.upload import upload_bp
 from app.routes.extract import extract_bp
 from app.routes.export import export_bp
+from app.routes.resize import resize_bp
+from app.routes.image_transparent import image_transparent_bp
 
 app.register_blueprint(upload_bp, url_prefix='/api')
 app.register_blueprint(extract_bp, url_prefix='/api')
 app.register_blueprint(export_bp, url_prefix='/api')
+app.register_blueprint(resize_bp, url_prefix='/api')
+app.register_blueprint(image_transparent_bp, url_prefix='/api')
