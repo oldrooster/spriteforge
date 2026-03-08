@@ -15,8 +15,11 @@ Sprite Forge is a single-page web application with multiple sprite-related tools
 │ [▶] V  │  │  step-section (4 wizard steps)                 │  │
 │ [⤡] R  │  │  wizard-footer (prev/next buttons)            │  │
 │ [▦] T  │  └────────────────────────────────────────────────┘  │
-│        │  ┌─ tool-panel: Make Transparent (hidden) ────────┐  │
-│ [«]    │  │  dropzone → canvas + eraser/zoom + download    │  │
+│ [📚] L │  ┌─ tool-panel: Make Transparent (hidden) ────────┐  │
+│        │  │  dropzone → canvas + eraser/zoom + download    │  │
+│ [«]    │  └────────────────────────────────────────────────┘  │
+│        │  ┌─ tool-panel: Sprite Library (hidden) ──────────┐  │
+│        │  │  grid view → detail view (resources + loops)   │  │
 │        │  └────────────────────────────────────────────────┘  │
 │        │  ┌─ tool-panel: Resize Images (hidden) ───────────┐  │
 │        │  │  dropzone + settings + download                │  │
@@ -40,7 +43,8 @@ spriteforge/
 │   │   ├── extract.py      # POST /api/extract, /api/transparency, /api/rembg, /api/save-frame
 │   │   ├── export.py       # GET /api/frames/<session>/<sub>/<file>, GET /api/download/<session>
 │   │   ├── resize.py       # POST /api/resize, GET /api/download-resized/<session>
-│   │   └── image_transparent.py  # POST /api/upload-image, GET /api/download-image/<session>
+│   │   ├── image_transparent.py  # POST /api/upload-image, GET /api/download-image/<session>
+│   │   └── library.py      # CRUD endpoints for Sprite Library (/api/library/*)
 │   ├── services/
 │   │   ├── video.py        # FFmpeg wrapper: probe_video(), extract_frames()
 │   │   └── image.py        # apply_transparency(), apply_rembg()
@@ -54,7 +58,9 @@ spriteforge/
 │           ├── preview.js  # Canvas animation preview with filmstrip
 │           ├── transparency.js  # Transparency tools, eraser, flood fill, zoom, preview bg
 │           ├── resize.js   # Batch image resize with aspect lock, interpolation options
-│           └── image-transparency.js  # Single image transparency tool
+│           ├── image-transparency.js  # Single image transparency tool
+│           ├── library-modal.js  # Shared modal component for library selection/save dialogs
+│           └── sprite-library.js  # Sprite Library grid view, detail view, loop management
 ```
 
 ## Navigation Architecture
@@ -129,6 +135,22 @@ The app uses two levels of navigation:
 - Resized images saved to `/app/output/<session_id>/resized/` as PNG
 - Download ZIP via `GET /api/download-resized/<session_id>`
 
+### Tool: Sprite Library
+
+- Persistent catalog for organizing sprites and their animation loops
+- **Grid view**: Shows all sprites as cards with thumbnail, name, and loop count; searchable
+- **Detail view**: Shows a sprite's resources (videos/images) and loops (frame sequences)
+- **Resources**: Upload videos/images associated with a sprite; video resources can be opened directly in Video to Frames
+- **Loops**: Named sequences of frames with filmstrip preview and animated playback
+  - Create by uploading frames, or save from Video to Frames output
+  - Download individual loops or all loops as ZIP
+- **Data storage**: JSON file-based (no database); `/app/library/sprites.json` master index + per-sprite `sprite.json` + frame files
+- **Docker volume**: `library` named volume for persistence across container rebuilds
+- **Integration points**:
+  - Video to Frames Step 1: "Select from Sprite Library" button opens modal to pick video resource
+  - Video to Frames Step 4: "Save to Sprite Library" button opens dialog to save frames as a loop
+  - Resize Images: "Import from Sprite Library" button opens modal to select loop frames as input
+
 ## Global State (`app.js`)
 
 ```js
@@ -161,12 +183,28 @@ Each JS file is an IIFE that reads DOM elements and attaches event listeners. Th
 | GET | `/api/download-resized/<session>` | Download resized images as ZIP |
 | POST | `/api/upload-image` | Upload single image for transparency tool |
 | GET | `/api/download-image/<session>` | Download transparent PNG |
+| GET | `/api/library` | List all sprites |
+| POST | `/api/library` | Create new sprite |
+| GET | `/api/library/<id>` | Get sprite detail (metadata + loops) |
+| PUT | `/api/library/<id>` | Rename sprite |
+| DELETE | `/api/library/<id>` | Delete sprite and all data |
+| GET | `/api/library/<id>/thumbnail` | Serve sprite thumbnail |
+| POST | `/api/library/<id>/resources` | Upload resource (video/image) |
+| DELETE | `/api/library/<id>/resources/<rid>` | Remove resource |
+| GET | `/api/library/<id>/resources/<rid>/file` | Serve resource file |
+| POST | `/api/library/<id>/loops` | Create loop (frames or from session) |
+| GET | `/api/library/<id>/loops/<lid>` | Get loop metadata |
+| PUT | `/api/library/<id>/loops/<lid>` | Rename loop |
+| DELETE | `/api/library/<id>/loops/<lid>` | Delete loop |
+| GET | `/api/library/<id>/loops/<lid>/frames/<file>` | Serve frame |
+| GET | `/api/library/<id>/loops/<lid>/download` | Download loop as ZIP |
+| GET | `/api/library/<id>/download` | Download all loops as ZIP |
 
 ## Docker Setup
 
 - **Base image**: `python:3.12-slim` with `ffmpeg` from apt
 - **Model pre-download**: u2net.onnx (~176MB) is downloaded at build time to `/root/.u2net/`
-- **Volumes**: `uploads` and `output` are named Docker volumes
+- **Volumes**: `uploads`, `output`, and `library` are named Docker volumes
 - **Live reload**: `app/` is bind-mounted so code changes apply immediately in dev
 - **Port**: 5000
 

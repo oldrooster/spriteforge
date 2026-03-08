@@ -7,10 +7,13 @@ services:
       - ./app:/app/app
       - uploads:/app/uploads
       - output:/app/output
+      - library:/app/library
     environment:
       - FLASK_DEBUG=1
       - MAX_UPLOAD_SIZE=500
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
 
 volumes:
   uploads:
   output:
+  library:

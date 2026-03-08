@@ -41,6 +41,7 @@
     let isErasing = false;
     let isRestoring = false;
     let previewBg = 'checkerboard';
+    let librarySource = null; // { sprite_id, loop_id, filename } when loaded from library
 
     // Zoom
     let zoomLevel = 1;
@@ -52,8 +53,57 @@
     eraserCursor.className = 'eraser-cursor';
     document.body.appendChild(eraserCursor);
 
+    // ── Select from Sprite Library ──
+    const fromLibraryBtn = document.getElementById('img-trans-from-library-btn');
+    if (fromLibraryBtn) {
+        fromLibraryBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window.openLibraryModal !== 'function') return;
+            window.openLibraryModal({
+                mode: 'loops',
+                title: 'Select Image for Transparency',
+                onSelect: async (result) => {
+                    const loop = result.items[0];
+                    const sprite = result.sprite;
+                    const frameName = 'frame_0001.png';
+                    const imgUrl = '/api/library/' + sprite.id + '/loops/' + loop.id + '/frames/' + frameName;
+                    try {
+                        const resp = await fetch(imgUrl);
+                        const blob = await resp.blob();
+                        const file = new File([blob], frameName, { type: 'image/png' });
+                        librarySource = { sprite_id: sprite.id, loop_id: loop.id, filename: frameName };
+                        uploadImage(file, true);
+                    } catch (err) {
+                        alert('Failed to load image from library: ' + err.message);
+                    }
+                },
+            });
+        });
+    }
+
+    // ── Back button ──
+    const backBtn = document.getElementById('img-trans-back-btn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            sessionId = null;
+            originalImage = null;
+            currentImageData = null;
+            librarySource = null;
+            eyedropperActive = false;
+            eraserMode = null;
+            dropzone.style.display = '';
+            canvasArea.hidden = true;
+            settingsPanel.style.display = 'none';
+            if (saveToLibraryBtn) saveToLibraryBtn.hidden = true;
+            fileInput.value = '';
+        });
+    }
+
     // ── Drag-and-drop upload ──
-    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('click', (e) => {
+        if (e.target === fromLibraryBtn || fromLibraryBtn.contains(e.target)) return;
+        fileInput.click();
+    });
     dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); });
     dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
     dropzone.addEventListener('drop', (e) => {
@@ -65,8 +115,9 @@
         if (fileInput.files.length) uploadImage(fileInput.files[0]);
     });
 
-    async function uploadImage(file) {
+    async function uploadImage(file, fromLibrary) {
         if (!file.type.startsWith('image/')) return;
+        if (!fromLibrary) librarySource = null;
 
         const formData = new FormData();
         formData.append('image', file);
@@ -83,6 +134,20 @@
         }
     }
 
+    function calcFitZoomIndex() {
+        if (!originalImage) return 2;
+        const containerW = zoomContainer.clientWidth || 600;
+        const containerH = zoomContainer.clientHeight || 500;
+        const fitScale = Math.min(containerW / originalImage.width, containerH / originalImage.height, 1);
+        // Find the closest zoom step that doesn't exceed the container
+        let best = 0;
+        for (let i = 0; i < ZOOM_STEPS.length; i++) {
+            if (ZOOM_STEPS[i] <= fitScale) best = i;
+            else break;
+        }
+        return best;
+    }
+
     function loadImage(url) {
         const img = new Image();
         img.onload = () => {
@@ -90,9 +155,12 @@
             currentImageData = null;
             canvas.width = img.width;
             canvas.height = img.height;
-            zoomStepIndex = 2;
+            zoomStepIndex = calcFitZoomIndex();
             applyZoom();
             drawFrame();
+
+            // Show/hide save-to-library button
+            if (saveToLibraryBtn) saveToLibraryBtn.hidden = !librarySource;
 
             // Show canvas and settings, hide dropzone
             dropzone.style.display = 'none';
@@ -139,7 +207,7 @@
 
     zoomInBtn.addEventListener('click', () => { if (zoomStepIndex < ZOOM_STEPS.length - 1) { zoomStepIndex++; applyZoom(); } });
     zoomOutBtn.addEventListener('click', () => { if (zoomStepIndex > 0) { zoomStepIndex--; applyZoom(); } });
-    zoomResetBtn.addEventListener('click', () => { zoomStepIndex = 2; applyZoom(); });
+    zoomResetBtn.addEventListener('click', () => { zoomStepIndex = calcFitZoomIndex(); applyZoom(); });
     zoomContainer.addEventListener('wheel', (e) => {
         if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
@@ -501,4 +569,37 @@
             window.location.href = `/api/download-image/${sessionId}`;
         }
     });
+
+    // ── Save back to Sprite Library ──
+    const saveToLibraryBtn = document.getElementById('img-trans-save-library-btn');
+    if (saveToLibraryBtn) {
+        saveToLibraryBtn.addEventListener('click', async () => {
+            if (!librarySource || !sessionId) return;
+            saveToLibraryBtn.disabled = true;
+            try {
+                // Get current image data as blob
+                const tmp = document.createElement('canvas');
+                tmp.width = canvas.width;
+                tmp.height = canvas.height;
+                const tmpCtx = tmp.getContext('2d');
+                if (currentImageData) {
+                    tmpCtx.putImageData(currentImageData, 0, 0);
+                } else {
+                    tmpCtx.drawImage(originalImage, 0, 0);
+                }
+                const blob = await new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
+                const formData = new FormData();
+                formData.append('image', blob, librarySource.filename);
+                const url = '/api/library/' + librarySource.sprite_id + '/loops/' + librarySource.loop_id + '/frames/' + librarySource.filename;
+                const resp = await fetch(url, { method: 'PUT', body: formData });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Save failed');
+                alert('Saved to sprite library!');
+            } catch (err) {
+                alert('Failed to save: ' + err.message);
+            } finally {
+                saveToLibraryBtn.disabled = false;
+            }
+        });
+    }
 })();

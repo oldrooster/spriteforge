@@ -37,12 +37,41 @@
                     </svg>
                     <span class="sidebar-label">Resize Images</span>
                 </li>
+                <li class="sidebar-item" data-tool="crop-image">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M6 2v4H2"/><path d="M18 22v-4h4"/>
+                        <rect x="6" y="6" width="12" height="12"/>
+                    </svg>
+                    <span class="sidebar-label">Crop Image</span>
+                </li>
                 <li class="sidebar-item" data-tool="make-transparent">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <rect x="3" y="3" width="18" height="18" rx="2"/>
                         <path d="M3 3l18 18"/><path d="M12 3v18"/><path d="M3 12h18"/>
                     </svg>
                     <span class="sidebar-label">Make Transparent</span>
+                </li>
+                <li class="sidebar-item" data-tool="sprite-library">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        <line x1="9" y1="7" x2="15" y2="7"/>
+                        <line x1="9" y1="11" x2="13" y2="11"/>
+                    </svg>
+                    <span class="sidebar-label">Sprite Library</span>
+                </li>
+                <li class="sidebar-item" data-tool="ai-generate">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2l3 7h7l-5.5 4.5 2 7L12 16l-6.5 4.5 2-7L2 9h7z"/>
+                    </svg>
+                    <span class="sidebar-label">AI Generate</span>
+                </li>
+                <li class="sidebar-item" data-tool="ai-animate">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                        <circle cx="19" cy="5" r="2.5" fill="currentColor" stroke="none"/>
+                    </svg>
+                    <span class="sidebar-label">AI Animate</span>
                 </li>
             </ul>
             <div class="sidebar-footer">
@@ -84,6 +113,7 @@
                                 </svg>
                                 <p>Drop video here or click to browse</p>
                                 <span class="hint">.mp4 .webm .mov .avi .mkv</span>
+                                <button id="upload-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Sprite Library</button>
                             </div>
                             <input type="file" id="file-input" accept=".mp4,.webm,.mov,.avi,.mkv" hidden>
                         </div>
@@ -119,7 +149,6 @@
                                     <button id="extract-play-btn" class="btn btn-secondary btn-small">Play</button>
                                     <button id="extract-pause-btn" class="btn btn-secondary btn-small" hidden>Pause</button>
                                     <button id="preview-range-btn" class="btn btn-secondary btn-small">Preview Range</button>
-                                    <label class="loop-label"><input type="checkbox" id="loop-checkbox"> Loop</label>
                                     <span class="video-time"><span id="video-current-time">0:00</span> / <span id="video-total-time">0:00</span></span>
                                 </div>
                                 <div class="range-slider-container">
@@ -329,6 +358,7 @@
                                 </div>
                                 <hr>
                                 <button id="download-btn" class="btn btn-accent">Download ZIP</button>
+                                <button id="save-to-library-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Save to Sprite Library</button>
                             </div>
                         </div>
                     </section>
@@ -356,10 +386,12 @@
                                 </svg>
                                 <p>Drop an image here or click to browse</p>
                                 <span class="hint">.png .jpg .jpeg .webp .gif</span>
+                                <button id="img-trans-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Sprite Library</button>
                             </div>
                             <input type="file" id="img-trans-file-input" accept=".png,.jpg,.jpeg,.webp,.gif" hidden>
                         </div>
                         <div id="img-trans-canvas-area" hidden>
+                            <button id="img-trans-back-btn" class="btn btn-secondary btn-small back-btn">&larr; Choose Another Image</button>
                             <div class="canvas-zoom-container" id="img-trans-zoom-container">
                                 <canvas id="img-trans-canvas"></canvas>
                             </div>
@@ -442,7 +474,69 @@
                         </div>
                         <hr>
                         <button id="img-trans-download-btn" class="btn btn-accent">Download PNG</button>
+                        <button id="img-trans-save-library-btn" class="btn btn-primary" hidden>Save to Sprite Library</button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Tool: Sprite Library -->
+            <div class="tool-panel" id="tool-sprite-library">
+                <!-- Library Grid View -->
+                <div id="library-grid-view">
+                    <div class="library-header">
+                        <h2>Sprite Library</h2>
+                        <div class="library-actions">
+                            <input type="text" id="library-search" class="library-search" placeholder="Search sprites...">
+                            <button id="library-new-btn" class="btn btn-primary btn-small">+ New Sprite</button>
+                        </div>
+                    </div>
+                    <div id="library-sprites-grid" class="sprites-grid">
+                        <div class="library-empty" id="library-empty">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                            </svg>
+                            <p>No sprites yet</p>
+                            <span class="hint">Click "+ New Sprite" to create your first sprite</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sprite Detail View -->
+                <div id="library-detail-view" hidden>
+                    <div class="library-detail-header">
+                        <button id="library-back-btn" class="btn btn-secondary btn-small">Back</button>
+                        <h2 id="library-sprite-name">Sprite Name</h2>
+                        <div class="library-detail-actions">
+                            <button id="library-rename-btn" class="btn btn-secondary btn-small">Rename</button>
+                            <button id="library-delete-sprite-btn" class="btn btn-secondary btn-small" style="color: var(--accent);">Delete</button>
+                        </div>
+                    </div>
+
+                    <div class="library-detail-section">
+                        <div class="library-section-header">
+                            <h3>Resources</h3>
+                            <label class="btn btn-secondary btn-small">
+                                + Upload Resource
+                                <input type="file" id="library-resource-input" accept=".mp4,.webm,.mov,.avi,.mkv,.png,.jpg,.jpeg,.webp,.gif" multiple hidden>
+                            </label>
+                        </div>
+                        <div id="library-resources-list" class="library-resources-list">
+                            <span class="hint" id="library-no-resources">No resources uploaded</span>
+                        </div>
+                    </div>
+
+                    <div class="library-detail-section">
+                        <div class="library-section-header">
+                            <h3>Loops</h3>
+                            <button id="library-new-loop-btn" class="btn btn-secondary btn-small">+ New Loop</button>
+                        </div>
+                        <div id="library-loops-list" class="library-loops-list">
+                            <span class="hint" id="library-no-loops">No loops yet</span>
+                        </div>
+                    </div>
+
+                    <button id="library-download-all-btn" class="btn btn-accent" style="margin-top: 16px;">Download All Loops as ZIP</button>
                 </div>
             </div>
 
@@ -460,10 +554,29 @@
                                 </svg>
                                 <p>Drop images here or click to browse</p>
                                 <span class="hint">.png .jpg .jpeg .webp .gif (multiple files supported)</span>
+                                <button id="resize-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Import from Sprite Library</button>
                             </div>
                             <input type="file" id="resize-file-input" accept=".png,.jpg,.jpeg,.webp,.gif" multiple hidden>
                         </div>
                         <div id="resize-file-list" class="resize-file-list" hidden></div>
+                        <div id="resize-preview" class="resize-preview" hidden>
+                            <div class="resize-preview-panels">
+                                <div class="resize-preview-panel">
+                                    <label>Original</label>
+                                    <div class="resize-preview-img-wrap">
+                                        <canvas id="resize-preview-original"></canvas>
+                                    </div>
+                                    <span class="hint" id="resize-preview-original-info"></span>
+                                </div>
+                                <div class="resize-preview-panel">
+                                    <label>Result</label>
+                                    <div class="resize-preview-img-wrap">
+                                        <canvas id="resize-preview-result"></canvas>
+                                    </div>
+                                    <span class="hint" id="resize-preview-result-info"></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="resize-settings">
                         <div class="setting-group">
@@ -496,6 +609,15 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="setting-group" id="resize-fit-group" hidden>
+                            <label>Aspect Ratio Mismatch</label>
+                            <span class="hint">How to handle when target size has a different aspect ratio</span>
+                            <div class="resize-mode-options">
+                                <label class="loop-label"><input type="radio" name="resize-fit" value="stretch" checked> Stretch</label>
+                                <label class="loop-label"><input type="radio" name="resize-fit" value="fit"> Scale to Fit</label>
+                                <label class="loop-label"><input type="radio" name="resize-fit" value="crop"> Crop to Fill</label>
+                            </div>
+                        </div>
                         <div class="setting-group" id="resize-percentage-group" hidden>
                             <label>Scale: <strong id="resize-scale-display">100</strong>%</label>
                             <input type="range" id="resize-scale-slider" min="1" max="800" value="100" class="slider">
@@ -522,10 +644,314 @@
                             <div class="progress-fill indeterminate"></div>
                         </div>
                         <button id="resize-download-btn" class="btn btn-accent" hidden>Download Resized ZIP</button>
+                        <button id="resize-save-library-btn" class="btn btn-primary" hidden>Save to Sprite Library</button>
                     </div>
                 </div>
             </div>
 
+            <!-- Tool: Crop Image -->
+            <div class="tool-panel" id="tool-crop-image">
+                <h2>Crop Image</h2>
+                <div class="crop-tool-layout">
+                    <div class="crop-upload-area">
+                        <div id="crop-dropzone" class="dropzone">
+                            <div class="dropzone-content">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                    <path d="M6 2v4H2"/><path d="M18 22v-4h4"/>
+                                    <rect x="6" y="6" width="12" height="12"/>
+                                </svg>
+                                <p>Drop an image here or click to browse</p>
+                                <span class="hint">.png .jpg .jpeg .webp .gif</span>
+                                <button id="crop-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Sprite Library</button>
+                            </div>
+                            <input type="file" id="crop-file-input" accept=".png,.jpg,.jpeg,.webp,.gif" hidden>
+                        </div>
+                        <div id="crop-canvas-area" hidden>
+                            <button id="crop-back-btn" class="btn btn-secondary btn-small back-btn">&larr; Choose Another Image</button>
+                            <div class="crop-canvas-wrap" id="crop-canvas-wrap">
+                                <canvas id="crop-canvas"></canvas>
+                            </div>
+                            <div class="crop-info-bar">
+                                <span id="crop-image-info" class="hint"></span>
+                            </div>
+                            <div id="crop-preview-section" hidden>
+                                <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; display: block;">Crop Preview</label>
+                                <div class="crop-preview-wrap">
+                                    <canvas id="crop-preview-canvas"></canvas>
+                                </div>
+                                <span id="crop-preview-info" class="hint"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="crop-settings" id="crop-settings" style="display:none">
+                        <div class="setting-group">
+                            <label>Crop Region</label>
+                            <div class="crop-inputs">
+                                <div class="crop-input-row">
+                                    <div class="crop-input-field">
+                                        <label>X</label>
+                                        <input type="number" id="crop-x-input" min="0" value="0">
+                                    </div>
+                                    <div class="crop-input-field">
+                                        <label>Y</label>
+                                        <input type="number" id="crop-y-input" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="crop-input-row">
+                                    <div class="crop-input-field">
+                                        <label>W</label>
+                                        <input type="number" id="crop-w-input" min="1" value="100">
+                                    </div>
+                                    <div class="crop-input-field">
+                                        <label>H</label>
+                                        <input type="number" id="crop-h-input" min="1" value="100">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-group">
+                            <label>Aspect Ratio</label>
+                            <div class="crop-aspect-btns">
+                                <button class="btn btn-secondary btn-small crop-aspect-btn active" data-ratio="free">Free</button>
+                                <button class="btn btn-secondary btn-small crop-aspect-btn" data-ratio="1:1">1:1</button>
+                                <button class="btn btn-secondary btn-small crop-aspect-btn" data-ratio="4:3">4:3</button>
+                                <button class="btn btn-secondary btn-small crop-aspect-btn" data-ratio="16:9">16:9</button>
+                            </div>
+                        </div>
+                        <div class="setting-group">
+                            <button id="crop-select-all-btn" class="btn btn-secondary" style="width:100%">Select Entire Image</button>
+                        </div>
+                        <hr>
+                        <button id="crop-btn" class="btn btn-primary" style="width:100%">Crop Image</button>
+                        <div id="crop-progress" class="progress-bar" hidden>
+                            <div class="progress-fill indeterminate"></div>
+                        </div>
+                        <button id="crop-download-btn" class="btn btn-accent" hidden>Download Cropped PNG</button>
+                        <button id="crop-save-library-btn" class="btn btn-primary" hidden>Save to Sprite Library</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tool: AI Generate -->
+            <div class="tool-panel" id="tool-ai-generate">
+                <h2>AI Sprite Generator</h2>
+                <div class="ai-layout">
+                    <div class="ai-preview">
+                        <div class="ai-canvas-wrap" id="ai-generate-canvas-wrap" hidden>
+                            <canvas id="ai-generate-canvas"></canvas>
+                        </div>
+                        <div id="ai-generate-empty" class="dropzone" style="pointer-events:none;">
+                            <div class="dropzone-content">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M12 2l3 7h7l-5.5 4.5 2 7L12 16l-6.5 4.5 2-7L2 9h7z"/>
+                                </svg>
+                                <p>Enter a prompt to generate a sprite</p>
+                                <span class="hint">AI will create a sprite image from your description</span>
+                            </div>
+                        </div>
+                        <div id="ai-generate-history" class="ai-history-strip"></div>
+                    </div>
+                    <div class="ai-settings">
+                        <div class="setting-group">
+                            <label>Model</label>
+                            <select id="ai-generate-model" class="styled-select"></select>
+                        </div>
+                        <div class="setting-group">
+                            <label>Prompt</label>
+                            <textarea id="ai-generate-prompt" class="styled-textarea" rows="4"
+                                placeholder="A knight character sprite, front-facing, pixel art style..."></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label>Reference Image <span class="hint">(optional)</span></label>
+                            <span class="hint">Provide an image to guide the generation</span>
+                            <div class="ai-ref-image-controls">
+                                <label class="btn btn-secondary btn-small">
+                                    Upload
+                                    <input type="file" id="ai-generate-ref-upload" accept=".png,.jpg,.jpeg,.webp,.gif" hidden>
+                                </label>
+                                <button id="ai-generate-ref-library-btn" class="btn btn-secondary btn-small">From Library</button>
+                                <button id="ai-generate-ref-clear-btn" class="btn btn-secondary btn-small" hidden>Clear</button>
+                            </div>
+                            <div id="ai-generate-ref-preview" class="ai-ref-preview" hidden>
+                                <img id="ai-generate-ref-img" alt="Reference image">
+                            </div>
+                        </div>
+                        <div class="setting-group">
+                            <div class="prompt-library-header">
+                                <label>Prompt Library</label>
+                                <button id="ai-generate-add-prompt-btn" class="btn btn-secondary btn-small" title="Add new prompt">+ New</button>
+                            </div>
+                            <div class="ai-sample-prompts" id="ai-generate-samples">
+                                <!-- Populated dynamically from /api/ai-generate/prompts -->
+                            </div>
+                            <!-- Prompt editor (shown when adding/editing) -->
+                            <div id="ai-prompt-editor" class="prompt-editor" hidden>
+                                <input type="text" id="ai-prompt-editor-name" class="prompt-editor-input" placeholder="Prompt name (e.g. Fantasy Warrior)">
+                                <textarea id="ai-prompt-editor-text" class="styled-textarea" rows="4" placeholder="Enter prompt text..."></textarea>
+                                <div class="prompt-editor-actions">
+                                    <button id="ai-prompt-editor-save" class="btn btn-primary btn-small">Save</button>
+                                    <button id="ai-prompt-editor-cancel" class="btn btn-secondary btn-small">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="ai-generate-btn" class="btn btn-primary" style="width:100%">Generate Sprite</button>
+                        <div id="ai-generate-progress" class="progress-bar" hidden>
+                            <div class="progress-fill indeterminate"></div>
+                        </div>
+                        <div id="ai-generate-refine-section" hidden>
+                            <hr>
+                            <div class="setting-group">
+                                <label>Refine</label>
+                                <span class="hint">Describe changes to make to the current image</span>
+                                <textarea id="ai-generate-refine-prompt" class="styled-textarea" rows="3"
+                                    placeholder="Add a sword in the right hand..."></textarea>
+                                <button id="ai-generate-refine-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Refine Image</button>
+                            </div>
+                        </div>
+                        <div id="ai-generate-actions" hidden>
+                            <hr>
+                            <button id="ai-generate-save-btn" class="btn btn-accent" style="width:100%">Save to Sprite Library</button>
+                            <button id="ai-generate-download-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Download PNG</button>
+                        </div>
+                        <div id="ai-generate-error" class="ai-error-msg" hidden></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tool: AI Animate -->
+            <div class="tool-panel" id="tool-ai-animate">
+                <h2>AI Sprite Animator</h2>
+                <div class="ai-layout">
+                    <div class="ai-preview">
+                        <div id="ai-animate-dropzone" class="dropzone" style="pointer-events:none;">
+                            <div class="dropzone-content">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                <p>Select a sprite to animate</p>
+                                <span class="hint">Choose from your Sprite Library below</span>
+                            </div>
+                        </div>
+                        <div id="ai-animate-source-wrap" hidden>
+                            <img id="ai-animate-source-img" alt="Source sprite">
+                            <span class="hint" id="ai-animate-source-info"></span>
+                            <div class="setting-group" style="margin-top:12px;">
+                                <label>Select Frame</label>
+                                <span class="hint">Click a frame to use as the source image</span>
+                                <div id="ai-animate-frame-picker" class="filmstrip" style="margin-top:8px;"></div>
+                            </div>
+                        </div>
+                        <div id="ai-animate-result" hidden>
+                            <h3>Generated Animation</h3>
+                            <video id="ai-animate-video" controls loop></video>
+                        </div>
+                    </div>
+                    <div class="ai-settings">
+                        <div class="setting-group">
+                            <label>Source Sprite</label>
+                            <button id="ai-animate-select-btn" class="btn btn-secondary" style="width:100%">Select from Sprite Library</button>
+                        </div>
+                        <div class="setting-group">
+                            <label>Model</label>
+                            <select id="ai-animate-model" class="styled-select"></select>
+                        </div>
+                        <div class="setting-group">
+                            <label>Animation Prompt</label>
+                            <textarea id="ai-animate-prompt" class="styled-textarea" rows="4"
+                                placeholder="Walking animation, side view, smooth loop..."></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label>Sample Prompts</label>
+                            <div class="ai-sample-prompts" id="ai-animate-samples">
+                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
+                                    data-prompt="Walking animation cycle, side view, moving to the right, smooth looping motion, consistent character design">Walk Right</button>
+                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
+                                    data-prompt="Walking animation cycle, side view, moving to the left, smooth looping motion, consistent character design">Walk Left</button>
+                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
+                                    data-prompt="Walking animation, front-facing view, walking towards the camera, smooth looping motion">Walk Forward</button>
+                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
+                                    data-prompt="Walking animation, back view, walking away from camera, smooth looping motion">Walk Backward</button>
+                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
+                                    data-prompt="Idle breathing animation, subtle up and down motion, front-facing, smooth loop, minimal movement">Idle/Breathing</button>
+                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
+                                    data-prompt="Talking animation, mouth opening and closing, subtle head movement, front-facing, smooth loop">Talking</button>
+                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
+                                    data-prompt="Attack animation, swinging weapon forward, side view, quick motion, return to idle pose">Attack</button>
+                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
+                                    data-prompt="Jump animation, crouching then leaping up and landing, front view, smooth arc motion">Jump</button>
+                            </div>
+                        </div>
+                        <button id="ai-animate-btn" class="btn btn-primary" style="width:100%" disabled>Generate Animation</button>
+                        <div id="ai-animate-progress" class="progress-bar" hidden>
+                            <div class="progress-fill indeterminate"></div>
+                        </div>
+                        <span id="ai-animate-status-text" class="hint" hidden>Generating video... this may take 1-2 minutes</span>
+                        <div id="ai-animate-actions" hidden>
+                            <hr>
+                            <div class="setting-group">
+                                <label>Save as Loop</label>
+                                <span class="hint">Extract frames from the video and save as a sprite loop</span>
+                                <div class="setting-group">
+                                    <label>Frames to extract: <strong id="ai-animate-frame-count-display">8</strong></label>
+                                    <input type="range" id="ai-animate-frame-count" min="2" max="32" value="8" class="slider">
+                                </div>
+                                <button id="ai-animate-save-btn" class="btn btn-accent" style="width:100%">Save Frames to Sprite Library</button>
+                            </div>
+                            <button id="ai-animate-download-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Download Video</button>
+                        </div>
+                        <div id="ai-animate-error" class="ai-error-msg" hidden></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Library Modal (shared by Video to Frames, Resize, etc.) -->
+    <div id="library-modal" class="modal-overlay" hidden>
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="library-modal-title">Select from Library</h3>
+                <button id="library-modal-close" class="btn btn-secondary btn-small">X</button>
+            </div>
+            <div class="modal-body">
+                <div id="library-modal-sprites" class="modal-sprites-grid"></div>
+                <div id="library-modal-loops" class="modal-loops-list" hidden></div>
+            </div>
+            <div class="modal-footer">
+                <button id="library-modal-back" class="btn btn-secondary btn-small" hidden>Back</button>
+                <span id="library-modal-info" class="hint"></span>
+                <button id="library-modal-confirm" class="btn btn-primary btn-small" disabled>Select</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save to Library Dialog -->
+    <div id="save-library-modal" class="modal-overlay" hidden>
+        <div class="modal-dialog modal-dialog-sm">
+            <div class="modal-header">
+                <h3>Save to Sprite Library</h3>
+                <button id="save-library-modal-close" class="btn btn-secondary btn-small">X</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>Sprite</label>
+                    <div class="save-library-sprite-options">
+                        <label class="loop-label"><input type="radio" name="save-lib-sprite-mode" value="existing" checked> Existing sprite</label>
+                        <label class="loop-label"><input type="radio" name="save-lib-sprite-mode" value="new"> New sprite</label>
+                    </div>
+                    <select id="save-library-sprite-select" class="styled-select" style="margin-top:8px;"></select>
+                    <input type="text" id="save-library-new-sprite-name" class="styled-select" placeholder="New sprite name..." style="margin-top:8px;" hidden>
+                </div>
+                <div class="setting-group">
+                    <label>Loop Name</label>
+                    <input type="text" id="save-library-loop-name" class="styled-select" placeholder="e.g. Walk Right" value="Untitled Loop">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span id="save-library-status" class="hint"></span>
+                <button id="save-library-confirm" class="btn btn-primary btn-small">Save</button>
+            </div>
         </div>
     </div>
 
@@ -536,5 +962,10 @@
     <script src="/static/js/transparency.js"></script>
     <script src="/static/js/resize.js"></script>
     <script src="/static/js/image-transparency.js"></script>
+    <script src="/static/js/library-modal.js"></script>
+    <script src="/static/js/sprite-library.js"></script>
+    <script src="/static/js/crop.js"></script>
+    <script src="/static/js/ai-generate.js"></script>
+    <script src="/static/js/ai-animate.js"></script>
 </body>
 </html>

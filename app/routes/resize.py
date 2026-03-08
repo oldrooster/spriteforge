@@ -29,6 +29,7 @@ def resize():
     interp = INTERPOLATION_MAP.get(interp_name, Image.BICUBIC)
     flip_h = request.form.get('flip_h') == 'true'
     flip_v = request.form.get('flip_v') == 'true'
+    fit_mode = request.form.get('fit', 'stretch')  # stretch, fit, crop
 
     session_id = str(uuid.uuid4())
     output_dir = os.path.join(current_app.config['OUTPUT_FOLDER'], session_id, 'resized')
@@ -44,11 +45,38 @@ def resize():
             s = int(scale) / 100.0
             new_w = max(1, round(img.width * s))
             new_h = max(1, round(img.height * s))
+            resized = img.resize((new_w, new_h), interp)
+        elif fit_mode == 'fit':
+            # Scale to fit: entire image visible, transparent letterbox
+            new_w = int(width)
+            new_h = int(height)
+            scale_x = new_w / img.width
+            scale_y = new_h / img.height
+            s = min(scale_x, scale_y)
+            fit_w = max(1, round(img.width * s))
+            fit_h = max(1, round(img.height * s))
+            scaled = img.resize((fit_w, fit_h), interp)
+            resized = Image.new('RGBA', (new_w, new_h), (0, 0, 0, 0))
+            offset_x = (new_w - fit_w) // 2
+            offset_y = (new_h - fit_h) // 2
+            resized.paste(scaled, (offset_x, offset_y))
+        elif fit_mode == 'crop':
+            # Crop to fill: image fills target, excess cropped from center
+            new_w = int(width)
+            new_h = int(height)
+            scale_x = new_w / img.width
+            scale_y = new_h / img.height
+            s = max(scale_x, scale_y)
+            scaled_w = max(1, round(img.width * s))
+            scaled_h = max(1, round(img.height * s))
+            scaled = img.resize((scaled_w, scaled_h), interp)
+            crop_x = (scaled_w - new_w) // 2
+            crop_y = (scaled_h - new_h) // 2
+            resized = scaled.crop((crop_x, crop_y, crop_x + new_w, crop_y + new_h))
         else:
             new_w = int(width)
             new_h = int(height)
-
-        resized = img.resize((new_w, new_h), interp)
+            resized = img.resize((new_w, new_h), interp)
 
         if flip_h:
             resized = resized.transpose(Image.FLIP_LEFT_RIGHT)
@@ -67,6 +95,39 @@ def resize():
         'files': results,
         'count': len(results),
     })
+
+
+@resize_bp.route('/save-resized-to-library', methods=['POST'])
+def save_resized_to_library():
+    """Save resized images back to their original sprite library locations."""
+    data = request.get_json(force=True)
+    session_id = data.get('session_id')
+    sprite_id = data.get('sprite_id')
+    frames = data.get('frames', [])  # [{ loop_id, filename }, ...]
+
+    if not session_id or not sprite_id or not frames:
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    output_dir = os.path.join(current_app.config['OUTPUT_FOLDER'], session_id, 'resized')
+    if not os.path.isdir(output_dir):
+        return jsonify({'error': 'Session not found'}), 404
+
+    resized_files = sorted(f for f in os.listdir(output_dir) if not f.startswith('.'))
+    if len(resized_files) != len(frames):
+        return jsonify({'error': f'Mismatch: {len(resized_files)} resized files vs {len(frames)} library frames'}), 400
+
+    lib_root = current_app.config['LIBRARY_FOLDER']
+    count = 0
+    for resized_name, frame_info in zip(resized_files, frames):
+        src_path = os.path.join(output_dir, resized_name)
+        dest_dir = os.path.join(lib_root, sprite_id, 'loops', frame_info['loop_id'])
+        dest_path = os.path.join(dest_dir, frame_info['filename'])
+        if os.path.isdir(dest_dir) and os.path.exists(dest_path):
+            img = Image.open(src_path)
+            img.save(dest_path, 'PNG')
+            count += 1
+
+    return jsonify({'ok': True, 'count': count})
 
 
 @resize_bp.route('/download-resized/<session_id>')

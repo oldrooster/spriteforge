@@ -30,7 +30,6 @@
     const playBtn = document.getElementById('extract-play-btn');
     const pauseBtn = document.getElementById('extract-pause-btn');
     const previewRangeBtn = document.getElementById('preview-range-btn');
-    const loopCheckbox = document.getElementById('loop-checkbox');
     const currentTimeEl = document.getElementById('video-current-time');
     const totalTimeEl = document.getElementById('video-total-time');
 
@@ -47,6 +46,33 @@
     // Flag to prevent feedback loop between crop box and inputs
     let updatingFromInputs = false;
     let updatingFromDrag = false;
+
+    // ── Rendered video rect (accounts for object-fit: contain letterboxing) ──
+
+    function getRenderedVideoRect() {
+        const elemRect = video.getBoundingClientRect();
+        if (!video.videoWidth || !video.videoHeight) return elemRect;
+
+        const videoAR = video.videoWidth / video.videoHeight;
+        const elemAR = elemRect.width / elemRect.height;
+
+        let renderW, renderH, renderX, renderY;
+        if (videoAR > elemAR) {
+            // Video wider than element → letterboxed top/bottom
+            renderW = elemRect.width;
+            renderH = elemRect.width / videoAR;
+            renderX = elemRect.left;
+            renderY = elemRect.top + (elemRect.height - renderH) / 2;
+        } else {
+            // Video taller than element → letterboxed left/right
+            renderH = elemRect.height;
+            renderW = elemRect.height * videoAR;
+            renderX = elemRect.left + (elemRect.width - renderW) / 2;
+            renderY = elemRect.top;
+        }
+
+        return { left: renderX, top: renderY, width: renderW, height: renderH };
+    }
 
     // ── Initialization ──
 
@@ -83,13 +109,17 @@
     }
 
     function initCropBox() {
-        const videoRect = video.getBoundingClientRect();
-        // Center crop box, size = 40% of smaller dimension
+        const videoRect = getRenderedVideoRect();
+        const containerRect = videoContainer.getBoundingClientRect();
+        const offsetX = videoRect.left - containerRect.left;
+        const offsetY = videoRect.top - containerRect.top;
+
+        // Center crop box, size = 40% of smaller rendered dimension
         const dim = Math.min(videoRect.width, videoRect.height) * 0.4;
         crop.w = dim;
         crop.h = dim;
-        crop.x = (videoRect.width - crop.w) / 2;
-        crop.y = (videoRect.height - crop.h) / 2;
+        crop.x = offsetX + (videoRect.width - crop.w) / 2;
+        crop.y = offsetY + (videoRect.height - crop.h) / 2;
         applyCrop();
         syncInputsFromCrop();
     }
@@ -131,26 +161,26 @@
             const pct = (video.currentTime / videoDuration) * 100;
             rangePlayhead.style.left = pct + '%';
         }
-        // Stop or loop at end of range when previewing
+        // Loop at end of range when previewing
         if (isPreviewingRange) {
             const end = parseFloat(rangeEnd.value);
-            if (video.currentTime >= end) {
-                if (loopCheckbox.checked) {
-                    video.currentTime = parseFloat(rangeStart.value);
-                } else {
-                    video.pause();
-                    isPreviewingRange = false;
-                    playBtn.hidden = false;
-                    pauseBtn.hidden = true;
-                }
+            // Use a small buffer to catch the boundary reliably
+            if (video.currentTime >= end - 0.05) {
+                video.currentTime = parseFloat(rangeStart.value);
             }
         }
     });
 
+    // Handle video naturally ending (when range end === video end)
     video.addEventListener('ended', () => {
-        isPreviewingRange = false;
-        playBtn.hidden = false;
-        pauseBtn.hidden = true;
+        if (isPreviewingRange) {
+            // Always loop back to range start
+            video.currentTime = parseFloat(rangeStart.value);
+            video.play();
+        } else {
+            playBtn.hidden = false;
+            pauseBtn.hidden = true;
+        }
     });
 
     function formatTime(seconds) {
@@ -262,12 +292,12 @@
     // ── Crop Box ──
 
     function constrainCrop() {
-        const rect = video.getBoundingClientRect();
+        const videoRect = getRenderedVideoRect();
         const containerRect = videoContainer.getBoundingClientRect();
-        const vw = rect.width;
-        const vh = rect.height;
-        const offsetX = rect.left - containerRect.left;
-        const offsetY = rect.top - containerRect.top;
+        const offsetX = videoRect.left - containerRect.left;
+        const offsetY = videoRect.top - containerRect.top;
+        const vw = videoRect.width;
+        const vh = videoRect.height;
 
         crop.w = Math.max(20, Math.min(crop.w, vw));
         crop.h = Math.max(20, Math.min(crop.h, vh));
@@ -309,15 +339,15 @@
     function syncCropFromInputs() {
         if (updatingFromDrag) return;
         updatingFromInputs = true;
-        const rect = video.getBoundingClientRect();
+        const videoRect = getRenderedVideoRect();
         const containerRect = videoContainer.getBoundingClientRect();
-        const offsetX = rect.left - containerRect.left;
-        const offsetY = rect.top - containerRect.top;
+        const offsetX = videoRect.left - containerRect.left;
+        const offsetY = videoRect.top - containerRect.top;
 
         if (!video.videoWidth) { updatingFromInputs = false; return; }
 
-        const scaleX = rect.width / video.videoWidth;
-        const scaleY = rect.height / video.videoHeight;
+        const scaleX = videoRect.width / video.videoWidth;
+        const scaleY = videoRect.height / video.videoHeight;
 
         const vx = parseInt(cropXInput.value) || 0;
         const vy = parseInt(cropYInput.value) || 0;
@@ -336,19 +366,27 @@
 
     function getVideoCropCoords() {
         if (!video.videoWidth) return null;
-        const rect = video.getBoundingClientRect();
+        const videoRect = getRenderedVideoRect();
         const containerRect = videoContainer.getBoundingClientRect();
-        const offsetX = rect.left - containerRect.left;
-        const offsetY = rect.top - containerRect.top;
-        const scaleX = video.videoWidth / rect.width;
-        const scaleY = video.videoHeight / rect.height;
+        const offsetX = videoRect.left - containerRect.left;
+        const offsetY = videoRect.top - containerRect.top;
+        const scaleX = video.videoWidth / videoRect.width;
+        const scaleY = video.videoHeight / videoRect.height;
 
-        return {
-            x: Math.max(0, Math.round((crop.x - offsetX) * scaleX)),
-            y: Math.max(0, Math.round((crop.y - offsetY) * scaleY)),
-            w: Math.round(crop.w * scaleX),
-            h: Math.round(crop.h * scaleY),
-        };
+        const x = Math.max(0, Math.round((crop.x - offsetX) * scaleX));
+        const y = Math.max(0, Math.round((crop.y - offsetY) * scaleY));
+        let w = Math.round(crop.w * scaleX);
+        let h = Math.round(crop.h * scaleY);
+
+        // Ensure crop doesn't exceed video bounds
+        w = Math.min(w, video.videoWidth - x);
+        h = Math.min(h, video.videoHeight - y);
+
+        // FFmpeg requires even dimensions for many codecs
+        w = Math.max(2, w - (w % 2));
+        h = Math.max(2, h - (h % 2));
+
+        return { x, y, w, h };
     }
 
     // Crop input listeners
@@ -430,9 +468,7 @@
     // Recalculate crop on window resize
     window.addEventListener('resize', () => {
         if (video.videoWidth) {
-            constrainCrop();
-            applyCrop();
-            syncInputsFromCrop();
+            syncCropFromInputs();
         }
     });
 

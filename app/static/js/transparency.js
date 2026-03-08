@@ -629,4 +629,32 @@
     downloadBtn.addEventListener('click', () => {
         window.location.href = `/api/download/${state.sessionId}`;
     });
+
+    // Save to Sprite Library
+    const saveToLibraryBtn = document.getElementById('save-to-library-btn');
+    if (saveToLibraryBtn) {
+        saveToLibraryBtn.addEventListener('click', () => {
+            if (!state.sessionId) return;
+            if (typeof window.openSaveModal === 'function') {
+                window.openSaveModal({
+                    defaultLoopName: 'Untitled Loop',
+                    onSave: async (spriteId, loopName) => {
+                        const source = state.transparentFrames ? 'transparent' : 'original';
+                        const formData = new FormData();
+                        formData.append('name', loopName);
+                        formData.append('session_id', state.sessionId);
+                        formData.append('source', source);
+                        formData.append('delay', state.animationDelay || 100);
+
+                        const resp = await fetch(`/api/library/${spriteId}/loops`, {
+                            method: 'POST',
+                            body: formData,
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok) throw new Error(data.error);
+                    },
+                });
+            }
+        });
+    }
 })();
