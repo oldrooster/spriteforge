@@ -107,6 +107,26 @@
         refImg.src = '';
     });
 
+    // Paste image from clipboard
+    document.addEventListener('paste', function (e) {
+        // Only handle if the AI Generate panel is visible
+        var panel = document.getElementById('tool-ai-generate');
+        if (!panel || !panel.classList.contains('active')) return;
+
+        var items = (e.clipboardData || {}).items;
+        if (!items) return;
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                e.preventDefault();
+                referenceBlob = items[i].getAsFile();
+                refImg.src = URL.createObjectURL(referenceBlob);
+                refPreview.hidden = false;
+                refClearBtn.hidden = false;
+                return;
+            }
+        }
+    });
+
     // ── Prompt Library ──
     async function loadPrompts() {
         try {

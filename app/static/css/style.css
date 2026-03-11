@@ -1692,6 +1692,22 @@ hr {
     border-color: var(--accent-hover);
 }
 
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
 .ai-error-msg {
     color: var(--accent);
     font-size: 13px;

@@ -7,23 +7,50 @@ from flask import Blueprint, request, jsonify, send_from_directory, current_app
 
 ai_generate_bp = Blueprint('ai_generate', __name__)
 
-MODELS = [
+MODELS_AI_STUDIO = [
+    {'id': 'gemini-2.5-flash-image', 'name': 'Gemini 2.5 Flash Image (Fast)', 'default': True},
+    {'id': 'gemini-3.1-flash-image-preview', 'name': 'Gemini 3.1 Flash Image (Latest)', 'default': False},
+    {'id': 'gemini-3-pro-image-preview', 'name': 'Gemini 3 Pro Image (High Quality)', 'default': False},
+]
+
+MODELS_VERTEX_AI = [
     {'id': 'gemini-2.5-flash-image', 'name': 'Gemini 2.5 Flash Image (Fast)', 'default': True},
     {'id': 'gemini-3.1-flash-image-preview', 'name': 'Gemini 3.1 Flash Image (Latest)', 'default': False},
     {'id': 'gemini-3-pro-image-preview', 'name': 'Gemini 3 Pro Image (High Quality)', 'default': False},
 ]
 
 
-def _get_client():
-    api_key = os.environ.get('GEMINI_API_KEY', '').strip()
-    if not api_key:
-        return None, (jsonify({
-            'error': 'GEMINI_API_KEY is not configured. '
-                     'Set it in docker-compose.yml or pass it as an environment variable.'
-        }), 500)
+def _is_vertex():
+    return bool(os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip())
+
+
+# Gemini 3.x preview models require the global endpoint on Vertex AI
+_GLOBAL_MODELS = {'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'}
+
+
+def _get_client(model_name=None):
     from google import genai
-    client = genai.Client(api_key=api_key)
-    return client, None
+
+    # Prefer Vertex AI if configured, fall back to API key
+    gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
+    gcp_location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'us-central1').strip()
+    api_key = os.environ.get('GEMINI_API_KEY', '').strip()
+
+    if gcp_project:
+        # Gemini 3.x preview models need the global endpoint
+        if model_name in _GLOBAL_MODELS:
+            gcp_location = 'global'
+        client = genai.Client(vertexai=True, project=gcp_project, location=gcp_location)
+        return client, None
+
+    if api_key:
+        client = genai.Client(api_key=api_key)
+        return client, None
+
+    return None, (jsonify({
+        'error': 'No AI backend configured. Set GOOGLE_CLOUD_PROJECT (for Vertex AI) '
+                 'or GEMINI_API_KEY (for AI Studio) in docker-compose.yml.'
+    }), 500)
 
 
 def _session_dir(session_id):
@@ -158,16 +185,13 @@ def reset_prompts():
 
 @ai_generate_bp.route('/ai-generate/models', methods=['GET'])
 def list_models():
-    return jsonify({'models': MODELS})
+    models = MODELS_VERTEX_AI if _is_vertex() else MODELS_AI_STUDIO
+    return jsonify({'models': models, 'backend': 'vertex_ai' if _is_vertex() else 'ai_studio'})
 
 
 @ai_generate_bp.route('/ai-generate', methods=['POST'])
 def generate():
-    client, err = _get_client()
-    if err:
-        return err
-
-    # Support both multipart form (with reference image) and JSON
+    # Extract model name first so we can route to the correct endpoint
     if request.content_type and 'multipart' in request.content_type:
         prompt = request.form.get('prompt', '').strip()
         model_name = request.form.get('model', 'gemini-2.5-flash-image')
@@ -177,6 +201,10 @@ def generate():
         prompt = data.get('prompt', '').strip()
         model_name = data.get('model', 'gemini-2.5-flash-image')
         ref_file = None
+
+    client, err = _get_client(model_name)
+    if err:
+        return err
 
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
@@ -238,14 +266,14 @@ def generate():
 
 @ai_generate_bp.route('/ai-generate/refine', methods=['POST'])
 def refine():
-    client, err = _get_client()
-    if err:
-        return err
-
     data = request.get_json(force=True)
     session_id = data.get('session_id')
     prompt = data.get('prompt', '').strip()
     model_name = data.get('model', 'gemini-2.5-flash-image')
+
+    client, err = _get_client(model_name)
+    if err:
+        return err
     reference_image = data.get('reference_image', '')
 
     if not session_id or not prompt:

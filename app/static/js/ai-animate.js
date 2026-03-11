@@ -12,8 +12,7 @@
     const resultSection = document.getElementById('ai-animate-result');
     const videoEl = document.getElementById('ai-animate-video');
     const actionsSection = document.getElementById('ai-animate-actions');
-    const frameCountSlider = document.getElementById('ai-animate-frame-count');
-    const frameCountDisplay = document.getElementById('ai-animate-frame-count-display');
+    const videoNameInput = document.getElementById('ai-animate-video-name');
     const saveBtn = document.getElementById('ai-animate-save-btn');
     const downloadBtn = document.getElementById('ai-animate-download-btn');
     const errorEl = document.getElementById('ai-animate-error');
@@ -110,11 +109,6 @@
         });
     });
 
-    // Frame count slider
-    frameCountSlider.addEventListener('input', function () {
-        frameCountDisplay.textContent = frameCountSlider.value;
-    });
-
     // Generate animation
     animateBtn.addEventListener('click', async function () {
         if (!selectedSprite || !promptInput.value.trim()) return;
@@ -133,9 +127,11 @@
                 body: JSON.stringify({
                     prompt: promptInput.value.trim(),
                     model: modelSelect.value,
+                    duration: parseInt(document.getElementById('ai-animate-duration').value, 10),
                     sprite_id: selectedSprite.sprite_id,
                     loop_id: selectedSprite.loop_id,
                     frame_index: selectedSprite.frame_index,
+                    generate_audio: document.getElementById('ai-animate-audio').checked,
                 }),
             });
             var data = await resp.json();
@@ -177,7 +173,7 @@
         }
     }
 
-    // Save to library (extract frames from video)
+    // Save video to sprite library
     saveBtn.addEventListener('click', async function () {
         if (!sessionId || !selectedSprite) return;
 
@@ -185,19 +181,18 @@
         errorEl.hidden = true;
 
         try {
-            var resp = await fetch('/api/ai-animate/save-to-library', {
+            var resp = await fetch('/api/ai-animate/save-video-to-library', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     session_id: sessionId,
                     sprite_id: selectedSprite.sprite_id,
-                    loop_name: 'AI Animation',
-                    frame_count: parseInt(frameCountSlider.value),
+                    video_name: videoNameInput.value.trim() || 'AI Animation',
                 }),
             });
             var data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Failed to save');
-            alert('Saved ' + data.frame_count + ' frames to sprite library!');
+            alert('Video saved to sprite library!');
         } catch (err) {
             showError(err.message);
         } finally {

@@ -856,6 +856,15 @@
                             <select id="ai-animate-model" class="styled-select"></select>
                         </div>
                         <div class="setting-group">
+                            <label>Duration</label>
+                            <select id="ai-animate-duration" class="styled-select">
+                                <option value="4" selected>4 seconds</option>
+                                <option value="5">5 seconds</option>
+                                <option value="6">6 seconds</option>
+                                <option value="8">8 seconds</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
                             <label>Animation Prompt</label>
                             <textarea id="ai-animate-prompt" class="styled-textarea" rows="4"
                                 placeholder="Walking animation, side view, smooth loop..."></textarea>
@@ -881,6 +890,12 @@
                                     data-prompt="Jump animation, crouching then leaping up and landing, front view, smooth arc motion">Jump</button>
                             </div>
                         </div>
+                        <div class="setting-group">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="ai-animate-audio">
+                                Generate with audio
+                            </label>
+                        </div>
                         <button id="ai-animate-btn" class="btn btn-primary" style="width:100%" disabled>Generate Animation</button>
                         <div id="ai-animate-progress" class="progress-bar" hidden>
                             <div class="progress-fill indeterminate"></div>
@@ -889,14 +904,10 @@
                         <div id="ai-animate-actions" hidden>
                             <hr>
                             <div class="setting-group">
-                                <label>Save as Loop</label>
-                                <span class="hint">Extract frames from the video and save as a sprite loop</span>
-                                <div class="setting-group">
-                                    <label>Frames to extract: <strong id="ai-animate-frame-count-display">8</strong></label>
-                                    <input type="range" id="ai-animate-frame-count" min="2" max="32" value="8" class="slider">
-                                </div>
-                                <button id="ai-animate-save-btn" class="btn btn-accent" style="width:100%">Save Frames to Sprite Library</button>
+                                <label>Video Name</label>
+                                <input type="text" id="ai-animate-video-name" class="styled-input" placeholder="AI Animation" value="AI Animation">
                             </div>
+                            <button id="ai-animate-save-btn" class="btn btn-accent" style="width:100%">Save Video to Sprite Library</button>
                             <button id="ai-animate-download-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Download Video</button>
                         </div>
                         <div id="ai-animate-error" class="ai-error-msg" hidden></div>
