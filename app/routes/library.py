@@ -107,17 +107,36 @@ def ensure_default_project():
 # ── Thumbnail generation ──
 
 def _generate_thumbnail(asset_id):
-    """Generate thumbnail from first frame of first view."""
+    """Generate thumbnail from thumbnail_resource_id if set, else first frame of first view."""
     asset = _read_json(_asset_path(asset_id))
-    if not asset or not asset.get('views'):
+    if not asset:
         return
-    first_view = asset['views'][0]
-    view_d = _view_dir(asset_id, first_view['id'])
-    frame_path = os.path.join(view_d, 'frame_0001.png')
-    if not os.path.exists(frame_path):
+
+    source_path = None
+
+    # Check for custom thumbnail resource
+    trid = asset.get('thumbnail_resource_id')
+    if trid:
+        for r in asset.get('resources', []):
+            if r['id'] == trid and r.get('type') == 'image':
+                candidate = os.path.join(_asset_dir(asset_id), 'resources', r['stored_name'])
+                if os.path.exists(candidate):
+                    source_path = candidate
+                break
+
+    # Fall back to first view's first frame
+    if not source_path and asset.get('views'):
+        first_view = asset['views'][0]
+        view_d = _view_dir(asset_id, first_view['id'])
+        candidate = os.path.join(view_d, 'frame_0001.png')
+        if os.path.exists(candidate):
+            source_path = candidate
+
+    if not source_path:
         return
+
     thumb_path = os.path.join(_asset_dir(asset_id), 'thumbnail.png')
-    img = Image.open(frame_path)
+    img = Image.open(source_path)
     img.thumbnail((128, 128), Image.LANCZOS)
     thumb = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
     offset = ((128 - img.width) // 2, (128 - img.height) // 2)
@@ -289,7 +308,15 @@ def update_asset(asset_id):
             tags = [t.strip() for t in tags.split(',') if t.strip()]
         asset['tags'] = tags
 
+    regen_thumb = False
+    if 'thumbnail_resource_id' in data:
+        asset['thumbnail_resource_id'] = data['thumbnail_resource_id'] or None
+        regen_thumb = True
+
     _write_json(_asset_path(asset_id), asset)
+
+    if regen_thumb:
+        _generate_thumbnail(asset_id)
 
     # Update assets index
     project_id = asset.get('project_id', DEFAULT_PROJECT_ID)
@@ -425,6 +452,87 @@ def serve_resource(asset_id, resource_id):
 
     resource_dir = os.path.join(_asset_dir(asset_id), 'resources')
     return send_from_directory(resource_dir, resource['stored_name'])
+
+
+@library_bp.route('/assets/<asset_id>/resources/<resource_id>', methods=['PUT'])
+def update_resource(asset_id, resource_id):
+    """Rename a resource (display name only, stored_name unchanged)."""
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    for r in asset['resources']:
+        if r['id'] == resource_id:
+            if 'filename' in data and data['filename'].strip():
+                r['filename'] = data['filename'].strip()
+            _write_json(_asset_path(asset_id), asset)
+            return jsonify(r)
+
+    return jsonify({'error': 'Resource not found'}), 404
+
+
+@library_bp.route('/assets/<asset_id>/resources/<resource_id>/duplicate', methods=['POST'])
+def duplicate_resource(asset_id, resource_id):
+    """Copy a resource with a new UUID."""
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+
+    source = None
+    for r in asset['resources']:
+        if r['id'] == resource_id:
+            source = r
+            break
+    if not source:
+        return jsonify({'error': 'Resource not found'}), 404
+
+    new_id = str(uuid.uuid4())
+    ext = os.path.splitext(source['stored_name'])[1]
+    new_stored = new_id + ext
+    resource_dir = os.path.join(_asset_dir(asset_id), 'resources')
+    src_path = os.path.join(resource_dir, source['stored_name'])
+    dst_path = os.path.join(resource_dir, new_stored)
+    if os.path.exists(src_path):
+        shutil.copy2(src_path, dst_path)
+
+    new_resource = {
+        'id': new_id,
+        'filename': 'Copy of ' + source['filename'],
+        'stored_name': new_stored,
+        'type': source['type'],
+        'uploaded': datetime.now(timezone.utc).isoformat(),
+    }
+    asset['resources'].append(new_resource)
+    _write_json(_asset_path(asset_id), asset)
+    _sync_asset_index(asset_id, asset)
+
+    return jsonify(new_resource), 201
+
+
+@library_bp.route('/assets/<asset_id>/resources/<resource_id>/file', methods=['PUT'])
+def overwrite_resource_file(asset_id, resource_id):
+    """Replace the stored file for a resource while keeping the same ID and metadata."""
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+
+    resource = None
+    for r in asset['resources']:
+        if r['id'] == resource_id:
+            resource = r
+            break
+    if not resource:
+        return jsonify({'error': 'Resource not found'}), 404
+
+    f = request.files.get('file')
+    if not f:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file_path = os.path.join(_asset_dir(asset_id), 'resources', resource['stored_name'])
+    f.save(file_path)
+
+    return jsonify({'ok': True})
 
 
 # ══════════════════════════════════════════════════════════════════════

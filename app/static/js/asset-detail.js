@@ -4,6 +4,7 @@
 
     let asset = null;
     let previewTimers = {};  // viewId → timer id
+    let activeContextMenu = null; // currently open context menu element
 
     // ── Load asset on panel activation ──
 
@@ -22,10 +23,24 @@
         render();
     }
 
+    // ── Dismiss context menu on outside click ──
+    document.addEventListener('click', () => dismissContextMenu());
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') dismissContextMenu();
+    });
+
+    function dismissContextMenu() {
+        if (activeContextMenu) {
+            activeContextMenu.remove();
+            activeContextMenu = null;
+        }
+    }
+
     // ── Render ──
 
     function render() {
         stopAllPreviews();
+        dismissContextMenu();
         content.innerHTML = '';
         const id = asset.id;
 
@@ -50,6 +65,7 @@
 
         const headerActions = el('div', 'asset-detail-header-actions');
         headerActions.appendChild(btn('Rename', 'btn btn-secondary btn-small', () => renameAsset()));
+        headerActions.appendChild(btn('Upload', 'btn btn-secondary btn-small', () => uploadResource()));
         headerActions.appendChild(btn('Download', 'btn btn-secondary btn-small', () => {
             window.open('/api/assets/' + id + '/download', '_blank');
         }));
@@ -66,13 +82,33 @@
         header.appendChild(headerActions);
         content.appendChild(header);
 
-        // ── Hero Thumbnail ──
-        const hero = el('div', 'asset-detail-hero');
-        const heroImg = document.createElement('img');
-        heroImg.src = '/api/assets/' + id + '/thumbnail?t=' + Date.now();
-        heroImg.alt = asset.name;
-        hero.appendChild(heroImg);
-        content.appendChild(hero);
+        // ── Resource Strip ──
+        const strip = el('div', 'resource-strip');
+        const resources = asset.resources || [];
+        const thumbResId = asset.thumbnail_resource_id || null;
+
+        if (resources.length > 0) {
+            resources.forEach(r => {
+                const isDefault = r.id === thumbResId;
+                const card = buildResourceCard(r, isDefault);
+                strip.appendChild(card);
+            });
+        } else {
+            // Show hero thumbnail as a placeholder when no resources exist
+            const heroCard = el('div', 'resource-card resource-card-hero');
+            const preview = el('div', 'resource-card-preview');
+            const img = document.createElement('img');
+            img.src = '/api/assets/' + id + '/thumbnail?t=' + Date.now();
+            img.alt = asset.name;
+            preview.appendChild(img);
+            heroCard.appendChild(preview);
+            const label = el('div', 'resource-card-name');
+            label.textContent = asset.name;
+            heroCard.appendChild(label);
+            strip.appendChild(heroCard);
+        }
+
+        content.appendChild(strip);
 
         // ── Tool Buttons ──
         const toolsSection = el('div', 'asset-detail-section');
@@ -112,23 +148,6 @@
         viewsSection.appendChild(newViewBtn);
         content.appendChild(viewsSection);
 
-        // ── Resources Section ──
-        const resSection = el('div', 'asset-detail-section');
-        resSection.appendChild(sectionTitle('Resources'));
-
-        if (asset.resources && asset.resources.length > 0) {
-            asset.resources.forEach(r => resSection.appendChild(renderResource(r)));
-        } else {
-            const empty = el('p', 'hint');
-            empty.textContent = 'No resources uploaded.';
-            resSection.appendChild(empty);
-        }
-
-        const uploadResBtn = btn('+ Upload Resource', 'btn btn-secondary btn-small', () => uploadResource());
-        uploadResBtn.style.marginTop = '12px';
-        resSection.appendChild(uploadResBtn);
-        content.appendChild(resSection);
-
         // ── Videos Section ──
         if (asset.videos && asset.videos.length > 0) {
             const vidSection = el('div', 'asset-detail-section');
@@ -136,6 +155,177 @@
             asset.videos.forEach(v => vidSection.appendChild(renderVideo(v)));
             content.appendChild(vidSection);
         }
+    }
+
+    // ── Build a resource card ──
+
+    function buildResourceCard(res, isDefault) {
+        const card = el('div', 'resource-card' + (isDefault ? ' resource-card-default' : ''));
+
+        // Preview area
+        const preview = el('div', 'resource-card-preview');
+        const fileUrl = '/api/assets/' + asset.id + '/resources/' + res.id + '/file';
+
+        if (res.type === 'image') {
+            const img = document.createElement('img');
+            img.src = fileUrl;
+            img.alt = res.filename;
+            img.loading = 'lazy';
+            preview.appendChild(img);
+        } else if (res.type === 'video') {
+            const vid = document.createElement('video');
+            vid.src = fileUrl;
+            vid.muted = true;
+            vid.preload = 'metadata';
+            preview.appendChild(vid);
+        } else {
+            // audio — show waveform icon placeholder
+            const icon = el('div', 'resource-audio-icon');
+            icon.innerHTML = '&#9835;';
+            preview.appendChild(icon);
+        }
+
+        // Type badge overlay
+        const badge = el('span', 'resource-card-badge');
+        badge.textContent = res.type.toUpperCase();
+        preview.appendChild(badge);
+
+        // Default star indicator
+        if (isDefault) {
+            const star = el('span', 'resource-card-star');
+            star.textContent = '\u2605';
+            star.title = 'Default / Hero image';
+            preview.appendChild(star);
+        }
+
+        // "..." context menu button
+        const menuBtn = el('button', 'resource-card-menu-btn');
+        menuBtn.textContent = '\u2026';
+        menuBtn.title = 'Actions';
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showContextMenu(res, menuBtn);
+        });
+        preview.appendChild(menuBtn);
+
+        card.appendChild(preview);
+
+        // Filename label
+        const nameLabel = el('div', 'resource-card-name');
+        nameLabel.textContent = res.filename;
+        nameLabel.title = res.filename;
+        card.appendChild(nameLabel);
+
+        return card;
+    }
+
+    // ── Context Menu ──
+
+    function showContextMenu(res, anchorEl) {
+        dismissContextMenu();
+
+        const menu = el('div', 'resource-context-menu');
+        const items = [];
+
+        if (res.type === 'image') {
+            items.push(['AI Generate', () => launchTool(res, 'ai-generate')]);
+            items.push(['AI Animate', () => launchTool(res, 'ai-animate')]);
+            items.push(['Crop', () => launchTool(res, 'crop-image')]);
+            items.push(['Resize', () => launchTool(res, 'resize-images')]);
+            items.push(['Make Transparent', () => launchTool(res, 'make-transparent')]);
+            items.push(['Mark Up', () => launchTool(res, 'markup')]);
+            items.push(null); // separator
+            items.push(['Set as Default', () => setAsDefault(res)]);
+        } else if (res.type === 'video') {
+            items.push(['Video to Frames', () => launchTool(res, 'video-to-frames')]);
+            items.push(null);
+        }
+
+        items.push(['Duplicate', () => duplicateResource(res)]);
+        items.push(['Rename', () => renameResource(res)]);
+        items.push(null);
+        items.push(['Delete', () => deleteResource(res), true]);
+
+        items.forEach(item => {
+            if (item === null) {
+                menu.appendChild(el('div', 'context-menu-sep'));
+                return;
+            }
+            const [label, action, isDanger] = item;
+            const menuItem = el('button', 'context-menu-item' + (isDanger ? ' context-menu-danger' : ''));
+            menuItem.textContent = label;
+            menuItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dismissContextMenu();
+                action();
+            });
+            menu.appendChild(menuItem);
+        });
+
+        // Position relative to the anchor button
+        const rect = anchorEl.getBoundingClientRect();
+        menu.style.position = 'fixed';
+        menu.style.top = rect.bottom + 4 + 'px';
+        menu.style.left = rect.right + 'px';
+        document.body.appendChild(menu);
+
+        // Adjust if off-screen right
+        const menuRect = menu.getBoundingClientRect();
+        if (menuRect.right > window.innerWidth - 8) {
+            menu.style.left = (rect.left - menuRect.width) + 'px';
+        }
+        // Adjust if off-screen bottom
+        if (menuRect.bottom > window.innerHeight - 8) {
+            menu.style.top = (rect.top - menuRect.height) + 'px';
+        }
+
+        activeContextMenu = menu;
+    }
+
+    // ── Context menu actions ──
+
+    function launchTool(res, toolRoute) {
+        state.pendingToolResource = {
+            asset_id: asset.id,
+            resource_id: res.id,
+            resource_url: '/api/assets/' + asset.id + '/resources/' + res.id + '/file',
+            filename: res.filename,
+            type: res.type,
+        };
+        navigate('#/asset/' + asset.id + '/tool/' + toolRoute);
+    }
+
+    async function setAsDefault(res) {
+        await fetch('/api/assets/' + asset.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ thumbnail_resource_id: res.id }),
+        });
+        load();
+    }
+
+    async function duplicateResource(res) {
+        await fetch('/api/assets/' + asset.id + '/resources/' + res.id + '/duplicate', {
+            method: 'POST',
+        });
+        load();
+    }
+
+    async function renameResource(res) {
+        const name = prompt('Rename resource:', res.filename);
+        if (!name || !name.trim() || name.trim() === res.filename) return;
+        await fetch('/api/assets/' + asset.id + '/resources/' + res.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: name.trim() }),
+        });
+        load();
+    }
+
+    async function deleteResource(res) {
+        if (!confirm('Delete resource "' + res.filename + '"?')) return;
+        await fetch('/api/assets/' + asset.id + '/resources/' + res.id, { method: 'DELETE' });
+        load();
     }
 
     // ── Render a single view ──
@@ -251,34 +441,6 @@
         previewTimers = {};
     }
 
-    // ── Render resource ──
-
-    function renderResource(res) {
-        const row = el('div', 'resource-item');
-
-        const nameSpan = el('span', 'resource-item-name');
-        nameSpan.textContent = res.filename;
-        row.appendChild(nameSpan);
-
-        const typeBadge = el('span', 'resource-type-badge');
-        typeBadge.textContent = res.type;
-        row.appendChild(typeBadge);
-
-        if (res.type === 'video') {
-            row.appendChild(btn('Open in V2F', 'btn btn-secondary btn-small', () => {
-                navigate('#/asset/' + asset.id + '/tool/video-to-frames');
-            }));
-        }
-
-        row.appendChild(btn('Delete', 'btn btn-secondary btn-small', async () => {
-            if (!confirm('Delete resource "' + res.filename + '"?')) return;
-            await fetch('/api/assets/' + asset.id + '/resources/' + res.id, { method: 'DELETE' });
-            load();
-        }));
-
-        return row;
-    }
-
     // ── Render video ──
 
     function renderVideo(vid) {
@@ -367,14 +529,17 @@
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.mp4,.webm,.mov,.avi,.mkv,.png,.jpg,.jpeg,.webp,.gif,.wav,.mp3,.ogg';
+        input.multiple = true;
         input.addEventListener('change', async () => {
             if (!input.files.length) return;
-            const fd = new FormData();
-            fd.append('file', input.files[0]);
-            await fetch('/api/assets/' + asset.id + '/resources', {
-                method: 'POST',
-                body: fd,
-            });
+            for (const file of input.files) {
+                const fd = new FormData();
+                fd.append('file', file);
+                await fetch('/api/assets/' + asset.id + '/resources', {
+                    method: 'POST',
+                    body: fd,
+                });
+            }
             load();
         });
         input.click();
