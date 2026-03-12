@@ -41,7 +41,7 @@
                     title: 'Select Video from Library',
                     onSelect: (result) => {
                         const resource = result.items[0];
-                        const videoUrl = `/api/library/${result.sprite.id}/resources/${resource.id}/file`;
+                        const videoUrl = `/api/assets/${result.sprite.id}/resources/${resource.id}/file`;
                         loadLibraryVideo(videoUrl, resource.filename);
                     },
                 });
@@ -88,7 +88,7 @@
         }
     }
 
-    // Expose for use from sprite-library.js
+    // Expose for use from library-modal.js
     window.uploadFromLibrary = function (videoUrl, filename) {
         loadLibraryVideo(videoUrl, filename);
     };

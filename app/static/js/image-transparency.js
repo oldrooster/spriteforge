@@ -66,12 +66,12 @@
                     const loop = result.items[0];
                     const sprite = result.sprite;
                     const frameName = 'frame_0001.png';
-                    const imgUrl = '/api/library/' + sprite.id + '/loops/' + loop.id + '/frames/' + frameName;
+                    const imgUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/' + frameName;
                     try {
                         const resp = await fetch(imgUrl);
                         const blob = await resp.blob();
                         const file = new File([blob], frameName, { type: 'image/png' });
-                        librarySource = { sprite_id: sprite.id, loop_id: loop.id, filename: frameName };
+                        librarySource = { asset_id: sprite.id, view_id: loop.id, filename: frameName };
                         uploadImage(file, true);
                     } catch (err) {
                         alert('Failed to load image from library: ' + err.message);
@@ -590,7 +590,7 @@
                 const blob = await new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
                 const formData = new FormData();
                 formData.append('image', blob, librarySource.filename);
-                const url = '/api/library/' + librarySource.sprite_id + '/loops/' + librarySource.loop_id + '/frames/' + librarySource.filename;
+                const url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
                 const resp = await fetch(url, { method: 'PUT', body: formData });
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.error || 'Save failed');

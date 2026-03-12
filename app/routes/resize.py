@@ -102,10 +102,10 @@ def save_resized_to_library():
     """Save resized images back to their original sprite library locations."""
     data = request.get_json(force=True)
     session_id = data.get('session_id')
-    sprite_id = data.get('sprite_id')
-    frames = data.get('frames', [])  # [{ loop_id, filename }, ...]
+    asset_id = data.get('asset_id')
+    frames = data.get('frames', [])  # [{ view_id, filename }, ...]
 
-    if not session_id or not sprite_id or not frames:
+    if not session_id or not asset_id or not frames:
         return jsonify({'error': 'Missing required fields'}), 400
 
     output_dir = os.path.join(current_app.config['OUTPUT_FOLDER'], session_id, 'resized')
@@ -120,7 +120,7 @@ def save_resized_to_library():
     count = 0
     for resized_name, frame_info in zip(resized_files, frames):
         src_path = os.path.join(output_dir, resized_name)
-        dest_dir = os.path.join(lib_root, sprite_id, 'loops', frame_info['loop_id'])
+        dest_dir = os.path.join(lib_root, 'assets', asset_id, 'views', frame_info['view_id'])
         dest_path = os.path.join(dest_dir, frame_info['filename'])
         if os.path.isdir(dest_dir) and os.path.exists(dest_path):
             img = Image.open(src_path)

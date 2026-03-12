@@ -11,8 +11,8 @@
 
     let modalMode = null; // 'video', 'loops'
     let modalCallback = null;
-    let modalSelectedSprite = null;
-    let modalSelectedItems = []; // selected loop IDs or resource
+    let modalSelectedAsset = null;
+    let modalSelectedItems = []; // selected view IDs or resource
     let modalMultiSelect = false;
 
     function openLibraryModal(options) {
@@ -21,17 +21,17 @@
         modalTitle.textContent = options.title || 'Select from Library';
         modalCallback = options.onSelect;
         modalMultiSelect = options.multiSelect || false;
-        modalSelectedSprite = null;
+        modalSelectedAsset = null;
         modalSelectedItems = [];
         modalConfirm.disabled = true;
         modalBack.hidden = true;
         modalInfo.textContent = '';
 
-        showModalSprites();
+        showModalAssets();
         modal.hidden = false;
     }
 
-    async function showModalSprites() {
+    async function showModalAssets() {
         modalSprites.hidden = false;
         modalLoops.hidden = true;
         modalBack.hidden = true;
@@ -39,38 +39,37 @@
         modalInfo.textContent = 'Loading...';
 
         try {
-            const resp = await fetch('/api/library');
-            const sprites = await resp.json();
+            const resp = await fetch('/api/projects/default/assets');
+            const assets = await resp.json();
             modalInfo.textContent = '';
 
-            if (sprites.length === 0) {
-                modalSprites.innerHTML = '<p class="hint" style="text-align:center;padding:20px;">No sprites in library</p>';
+            if (assets.length === 0) {
+                modalSprites.innerHTML = '<p class="hint" style="text-align:center;padding:20px;">No assets in library</p>';
                 return;
             }
 
-            // Filter: for 'video' mode, show all sprites (they can have video resources)
-            // For 'loops' mode, only show sprites with loops
+            // Filter: for 'loops' mode, only show assets with views
             const filtered = modalMode === 'loops'
-                ? sprites.filter(s => (s.loop_count || 0) > 0)
-                : sprites;
+                ? assets.filter(a => (a.view_count || 0) > 0)
+                : assets;
 
             if (filtered.length === 0) {
-                const msg = modalMode === 'loops' ? 'No sprites with loops' : 'No sprites with video resources';
+                const msg = modalMode === 'loops' ? 'No assets with views' : 'No assets with video resources';
                 modalSprites.innerHTML = `<p class="hint" style="text-align:center;padding:20px;">${msg}</p>`;
                 return;
             }
 
-            filtered.forEach(s => {
+            filtered.forEach(a => {
                 const card = document.createElement('div');
                 card.className = 'modal-sprite-card';
-                card.addEventListener('click', () => selectModalSprite(s.id));
+                card.addEventListener('click', () => selectModalAsset(a.id));
 
                 const thumb = document.createElement('img');
-                thumb.src = `/api/library/${s.id}/thumbnail?t=${Date.now()}`;
+                thumb.src = `/api/assets/${a.id}/thumbnail?t=${Date.now()}`;
 
                 const name = document.createElement('div');
                 name.className = 'modal-sprite-name';
-                name.textContent = s.name;
+                name.textContent = a.name;
 
                 card.appendChild(thumb);
                 card.appendChild(name);
@@ -81,10 +80,10 @@
         }
     }
 
-    async function selectModalSprite(spriteId) {
+    async function selectModalAsset(assetId) {
         try {
-            const resp = await fetch(`/api/library/${spriteId}`);
-            modalSelectedSprite = await resp.json();
+            const resp = await fetch(`/api/assets/${assetId}`);
+            modalSelectedAsset = await resp.json();
         } catch (e) {
             return;
         }
@@ -92,7 +91,7 @@
         if (modalMode === 'video') {
             showModalResources();
         } else {
-            showModalLoops();
+            showModalViews();
         }
     }
 
@@ -104,9 +103,9 @@
         modalSelectedItems = [];
         modalConfirm.disabled = true;
 
-        const resources = (modalSelectedSprite.resources || []).filter(r => r.type === 'video');
+        const resources = (modalSelectedAsset.resources || []).filter(r => r.type === 'video');
         if (resources.length === 0) {
-            modalLoops.innerHTML = '<p class="hint" style="text-align:center;padding:20px;">No video resources in this sprite</p>';
+            modalLoops.innerHTML = '<p class="hint" style="text-align:center;padding:20px;">No video resources in this asset</p>';
             return;
         }
 
@@ -122,7 +121,7 @@
             });
 
             const icon = document.createElement('span');
-            icon.textContent = '🎬';
+            icon.textContent = '\uD83C\uDFAC';
             const name = document.createElement('span');
             name.textContent = r.filename;
 
@@ -132,7 +131,7 @@
         });
     }
 
-    function showModalLoops() {
+    function showModalViews() {
         modalSprites.hidden = true;
         modalLoops.hidden = false;
         modalBack.hidden = false;
@@ -140,27 +139,27 @@
         modalSelectedItems = [];
         modalConfirm.disabled = true;
 
-        const loops = modalSelectedSprite.loops || [];
-        if (loops.length === 0) {
-            modalLoops.innerHTML = '<p class="hint" style="text-align:center;padding:20px;">No loops in this sprite</p>';
+        const views = modalSelectedAsset.views || [];
+        if (views.length === 0) {
+            modalLoops.innerHTML = '<p class="hint" style="text-align:center;padding:20px;">No views in this asset</p>';
             return;
         }
 
-        loops.forEach(loop => {
+        views.forEach(view => {
             const item = document.createElement('div');
             item.className = 'modal-loop-item';
             item.addEventListener('click', () => {
                 if (modalMultiSelect) {
                     item.classList.toggle('selected');
                     if (item.classList.contains('selected')) {
-                        modalSelectedItems.push(loop);
+                        modalSelectedItems.push(view);
                     } else {
-                        modalSelectedItems = modalSelectedItems.filter(l => l.id !== loop.id);
+                        modalSelectedItems = modalSelectedItems.filter(v => v.id !== view.id);
                     }
                 } else {
                     modalLoops.querySelectorAll('.modal-loop-item').forEach(el => el.classList.remove('selected'));
                     item.classList.add('selected');
-                    modalSelectedItems = [loop];
+                    modalSelectedItems = [view];
                 }
                 modalConfirm.disabled = modalSelectedItems.length === 0;
                 modalInfo.textContent = `${modalSelectedItems.length} selected`;
@@ -169,26 +168,26 @@
             const info = document.createElement('div');
             info.className = 'modal-loop-info';
             const title = document.createElement('strong');
-            title.textContent = loop.name;
+            title.textContent = view.name;
             const meta = document.createElement('span');
             meta.className = 'hint';
-            meta.textContent = ` ${loop.frame_count} frames, ${loop.width}x${loop.height}`;
+            meta.textContent = ` ${view.frame_count} frames, ${view.width}x${view.height}`;
             info.appendChild(title);
             info.appendChild(meta);
 
             // Mini filmstrip (up to 8 frames)
             const strip = document.createElement('div');
             strip.className = 'modal-filmstrip';
-            const maxShow = Math.min(loop.frame_count, 8);
+            const maxShow = Math.min(view.frame_count, 8);
             for (let i = 1; i <= maxShow; i++) {
                 const img = document.createElement('img');
-                img.src = `/api/library/${modalSelectedSprite.id}/loops/${loop.id}/frames/frame_${String(i).padStart(4, '0')}.png`;
+                img.src = `/api/assets/${modalSelectedAsset.id}/views/${view.id}/frames/frame_${String(i).padStart(4, '0')}.png`;
                 strip.appendChild(img);
             }
-            if (loop.frame_count > 8) {
+            if (view.frame_count > 8) {
                 const more = document.createElement('span');
                 more.className = 'hint';
-                more.textContent = `+${loop.frame_count - 8}`;
+                more.textContent = `+${view.frame_count - 8}`;
                 strip.appendChild(more);
             }
 
@@ -199,7 +198,7 @@
     }
 
     modalBack.addEventListener('click', () => {
-        showModalSprites();
+        showModalAssets();
         modalSelectedItems = [];
         modalConfirm.disabled = true;
     });
@@ -219,7 +218,7 @@
     modalConfirm.addEventListener('click', () => {
         if (modalCallback && modalSelectedItems.length > 0) {
             modalCallback({
-                sprite: modalSelectedSprite,
+                sprite: modalSelectedAsset,
                 items: modalSelectedItems,
             });
         }
@@ -231,47 +230,50 @@
 
     const saveModal = document.getElementById('save-library-modal');
     const saveModalClose = document.getElementById('save-library-modal-close');
-    const saveSpriteSelect = document.getElementById('save-library-sprite-select');
-    const saveNewSpriteName = document.getElementById('save-library-new-sprite-name');
-    const saveLoopName = document.getElementById('save-library-loop-name');
+    const saveAssetSelect = document.getElementById('save-library-sprite-select');
+    const saveNewAssetName = document.getElementById('save-library-new-sprite-name');
+    const saveViewName = document.getElementById('save-library-loop-name');
     const saveConfirm = document.getElementById('save-library-confirm');
     const saveStatus = document.getElementById('save-library-status');
 
     let saveCallback = null;
 
     async function openSaveModal(options) {
-        // options: { onSave(spriteId, loopName) }
+        // options: { onSave(assetId, viewName), defaultLoopName }
         saveCallback = options.onSave;
         saveStatus.textContent = '';
-        saveLoopName.value = options.defaultLoopName || 'Untitled Loop';
+        saveViewName.value = options.defaultLoopName || 'Untitled View';
 
-        // Load sprites for dropdown
+        // Load assets for dropdown
         try {
-            const resp = await fetch('/api/library');
-            const sprites = await resp.json();
-            saveSpriteSelect.innerHTML = '';
-            sprites.forEach(s => {
+            const resp = await fetch('/api/projects/default/assets');
+            const assets = await resp.json();
+            saveAssetSelect.innerHTML = '';
+            assets.forEach(a => {
                 const opt = document.createElement('option');
-                opt.value = s.id;
-                opt.textContent = s.name;
-                saveSpriteSelect.appendChild(opt);
+                opt.value = a.id;
+                opt.textContent = a.name;
+                saveAssetSelect.appendChild(opt);
             });
 
-            if (sprites.length === 0) {
-                // Default to new sprite mode
+            if (assets.length === 0) {
                 document.querySelector('input[name="save-lib-sprite-mode"][value="new"]').checked = true;
-                saveSpriteSelect.hidden = true;
-                saveNewSpriteName.hidden = false;
+                saveAssetSelect.hidden = true;
+                saveNewAssetName.hidden = false;
             } else {
+                // Pre-select current asset if available
+                if (state.currentAssetId) {
+                    saveAssetSelect.value = state.currentAssetId;
+                }
                 document.querySelector('input[name="save-lib-sprite-mode"][value="existing"]').checked = true;
-                saveSpriteSelect.hidden = false;
-                saveNewSpriteName.hidden = true;
+                saveAssetSelect.hidden = false;
+                saveNewAssetName.hidden = true;
             }
         } catch (e) {
-            saveSpriteSelect.innerHTML = '';
+            saveAssetSelect.innerHTML = '';
             document.querySelector('input[name="save-lib-sprite-mode"][value="new"]').checked = true;
-            saveSpriteSelect.hidden = true;
-            saveNewSpriteName.hidden = false;
+            saveAssetSelect.hidden = true;
+            saveNewAssetName.hidden = false;
         }
 
         saveModal.hidden = false;
@@ -280,8 +282,8 @@
     document.querySelectorAll('input[name="save-lib-sprite-mode"]').forEach(radio => {
         radio.addEventListener('change', () => {
             const mode = document.querySelector('input[name="save-lib-sprite-mode"]:checked').value;
-            saveSpriteSelect.hidden = mode !== 'existing';
-            saveNewSpriteName.hidden = mode !== 'new';
+            saveAssetSelect.hidden = mode !== 'existing';
+            saveNewAssetName.hidden = mode !== 'new';
         });
     });
 
@@ -299,39 +301,39 @@
 
     saveConfirm.addEventListener('click', async () => {
         const mode = document.querySelector('input[name="save-lib-sprite-mode"]:checked').value;
-        const loopName = saveLoopName.value.trim() || 'Untitled Loop';
-        let spriteId;
+        const viewName = saveViewName.value.trim() || 'Untitled View';
+        let assetId;
 
         saveConfirm.disabled = true;
         saveStatus.textContent = 'Saving...';
 
         try {
             if (mode === 'new') {
-                const spriteName = saveNewSpriteName.value.trim();
-                if (!spriteName) {
-                    saveStatus.textContent = 'Enter a sprite name';
+                const assetName = saveNewAssetName.value.trim();
+                if (!assetName) {
+                    saveStatus.textContent = 'Enter an asset name';
                     saveConfirm.disabled = false;
                     return;
                 }
-                const resp = await fetch('/api/library', {
+                const resp = await fetch('/api/projects/default/assets', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: spriteName }),
+                    body: JSON.stringify({ name: assetName }),
                 });
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.error);
-                spriteId = data.id;
+                assetId = data.id;
             } else {
-                spriteId = saveSpriteSelect.value;
-                if (!spriteId) {
-                    saveStatus.textContent = 'Select a sprite';
+                assetId = saveAssetSelect.value;
+                if (!assetId) {
+                    saveStatus.textContent = 'Select an asset';
                     saveConfirm.disabled = false;
                     return;
                 }
             }
 
             if (saveCallback) {
-                await saveCallback(spriteId, loopName);
+                await saveCallback(assetId, viewName);
             }
 
             saveStatus.textContent = 'Saved!';

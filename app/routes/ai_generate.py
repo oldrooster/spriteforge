@@ -104,7 +104,7 @@ DEFAULT_PROMPTS = [
 
 
 def _prompts_path():
-    return os.path.join(current_app.config['LIBRARY_FOLDER'], 'prompts.json')
+    return os.path.join(current_app.config['LIBRARY_FOLDER'], 'projects', 'default', 'prompts.json')
 
 
 def _read_prompts():
@@ -209,6 +209,21 @@ def generate():
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
 
+    # Template variable substitution
+    if request.content_type and 'multipart' in request.content_type:
+        asset_id = request.form.get('asset_id', '')
+    else:
+        asset_id = data.get('asset_id', '') if ref_file is None else ''
+
+    from app.routes.library import _read_json, _project_path, _asset_path
+    project = _read_json(_project_path('default'), {})
+    asset_name = ''
+    if asset_id:
+        asset_data = _read_json(_asset_path(asset_id), {})
+        asset_name = asset_data.get('name', '')
+    prompt = prompt.replace('{{art_style}}', project.get('art_style', ''))
+    prompt = prompt.replace('{{asset_name}}', asset_name)
+
     session_id = str(uuid.uuid4())
     session_dir = _session_dir(session_id)
 
@@ -278,6 +293,17 @@ def refine():
 
     if not session_id or not prompt:
         return jsonify({'error': 'session_id and prompt are required'}), 400
+
+    # Template variable substitution
+    asset_id = data.get('asset_id', '')
+    from app.routes.library import _read_json, _project_path, _asset_path
+    project = _read_json(_project_path('default'), {})
+    asset_name = ''
+    if asset_id:
+        asset_data = _read_json(_asset_path(asset_id), {})
+        asset_name = asset_data.get('name', '')
+    prompt = prompt.replace('{{art_style}}', project.get('art_style', ''))
+    prompt = prompt.replace('{{asset_name}}', asset_name)
 
     session_dir = _session_dir(session_id)
     history = _read_history(session_dir)

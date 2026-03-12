@@ -11,56 +11,112 @@ from PIL import Image
 
 library_bp = Blueprint('library', __name__)
 
-SPRITES_INDEX = 'sprites.json'
+# ── Constants ──
 
+CATEGORIES = ['characters', 'backgrounds', 'objects', 'ui', 'sounds']
+DEFAULT_PROJECT_ID = 'default'
+DEFAULT_PROJECT_NAME = 'My Project'
+
+
+# ── Path helpers ──
 
 def _lib_root():
     return current_app.config['LIBRARY_FOLDER']
 
 
-def _read_index():
-    path = os.path.join(_lib_root(), SPRITES_INDEX)
-    if not os.path.exists(path):
-        return []
-    with open(path, 'r') as f:
-        return json.load(f)
+def _projects_index_path():
+    return os.path.join(_lib_root(), 'projects.json')
 
 
-def _write_index(data):
-    path = os.path.join(_lib_root(), SPRITES_INDEX)
+def _project_dir(project_id):
+    return os.path.join(_lib_root(), 'projects', project_id)
+
+
+def _project_path(project_id):
+    return os.path.join(_project_dir(project_id), 'project.json')
+
+
+def _assets_index_path(project_id):
+    return os.path.join(_project_dir(project_id), 'assets.json')
+
+
+def _asset_dir(asset_id):
+    return os.path.join(_lib_root(), 'assets', asset_id)
+
+
+def _asset_path(asset_id):
+    return os.path.join(_asset_dir(asset_id), 'asset.json')
+
+
+def _view_dir(asset_id, view_id):
+    return os.path.join(_asset_dir(asset_id), 'views', view_id)
+
+
+# ── JSON read/write helpers ──
+
+def _read_json(path, default=None):
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            return json.load(f)
+    return default if default is not None else []
+
+
+def _write_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + '.tmp'
     with open(tmp, 'w') as f:
         json.dump(data, f, indent=2)
     os.replace(tmp, path)
 
 
-def _read_sprite(sprite_id):
-    path = os.path.join(_lib_root(), sprite_id, 'sprite.json')
-    if not os.path.exists(path):
-        return None
-    with open(path, 'r') as f:
-        return json.load(f)
+# ── Default project bootstrap ──
 
+def ensure_default_project():
+    """Create the default project and directory structure if missing."""
+    lib = _lib_root()
+    os.makedirs(os.path.join(lib, 'projects'), exist_ok=True)
+    os.makedirs(os.path.join(lib, 'assets'), exist_ok=True)
 
-def _write_sprite(sprite_id, data):
-    path = os.path.join(_lib_root(), sprite_id, 'sprite.json')
-    tmp = path + '.tmp'
-    with open(tmp, 'w') as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, path)
-
-
-def _generate_thumbnail(sprite_id):
-    """Generate thumbnail from first frame of first loop."""
-    sprite = _read_sprite(sprite_id)
-    if not sprite or not sprite.get('loops'):
+    projects = _read_json(_projects_index_path(), [])
+    if any(p['id'] == DEFAULT_PROJECT_ID for p in projects):
         return
-    first_loop = sprite['loops'][0]
-    loop_dir = os.path.join(_lib_root(), sprite_id, 'loops', first_loop['id'])
-    frame_path = os.path.join(loop_dir, 'frame_0001.png')
+
+    now = datetime.now(timezone.utc).isoformat()
+    project = {
+        'id': DEFAULT_PROJECT_ID,
+        'name': DEFAULT_PROJECT_NAME,
+        'created': now,
+        'art_style': '',
+        'default_resolution': {'width': 64, 'height': 64},
+        'categories': list(CATEGORIES),
+    }
+
+    os.makedirs(_project_dir(DEFAULT_PROJECT_ID), exist_ok=True)
+    _write_json(_project_path(DEFAULT_PROJECT_ID), project)
+    _write_json(_assets_index_path(DEFAULT_PROJECT_ID), [])
+
+    projects.append({
+        'id': DEFAULT_PROJECT_ID,
+        'name': DEFAULT_PROJECT_NAME,
+        'created': now,
+        'asset_count': 0,
+    })
+    _write_json(_projects_index_path(), projects)
+
+
+# ── Thumbnail generation ──
+
+def _generate_thumbnail(asset_id):
+    """Generate thumbnail from first frame of first view."""
+    asset = _read_json(_asset_path(asset_id))
+    if not asset or not asset.get('views'):
+        return
+    first_view = asset['views'][0]
+    view_d = _view_dir(asset_id, first_view['id'])
+    frame_path = os.path.join(view_d, 'frame_0001.png')
     if not os.path.exists(frame_path):
         return
-    thumb_path = os.path.join(_lib_root(), sprite_id, 'thumbnail.png')
+    thumb_path = os.path.join(_asset_dir(asset_id), 'thumbnail.png')
     img = Image.open(frame_path)
     img.thumbnail((128, 128), Image.LANCZOS)
     thumb = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
@@ -69,109 +125,211 @@ def _generate_thumbnail(sprite_id):
     thumb.save(thumb_path, 'PNG')
 
 
-# ── List all sprites ──
+def _sync_asset_index(asset_id, asset):
+    """Keep the project's assets.json counts in sync."""
+    project_id = asset.get('project_id', DEFAULT_PROJECT_ID)
+    index_path = _assets_index_path(project_id)
+    index = _read_json(index_path, [])
+    for entry in index:
+        if entry['id'] == asset_id:
+            entry['view_count'] = len(asset.get('views', []))
+            entry['resource_count'] = len(asset.get('resources', []))
+            break
+    _write_json(index_path, index)
 
-@library_bp.route('/library', methods=['GET'])
-def list_sprites():
-    sprites = _read_index()
-    return jsonify(sprites)
+
+def _sync_project_asset_count(project_id):
+    """Keep the projects.json asset_count in sync."""
+    index = _read_json(_assets_index_path(project_id), [])
+    projects = _read_json(_projects_index_path(), [])
+    for p in projects:
+        if p['id'] == project_id:
+            p['asset_count'] = len(index)
+            break
+    _write_json(_projects_index_path(), projects)
 
 
-# ── Create sprite ──
+# ══════════════════════════════════════════════════════════════════════
+#  PROJECT ROUTES
+# ══════════════════════════════════════════════════════════════════════
 
-@library_bp.route('/library', methods=['POST'])
-def create_sprite():
+@library_bp.route('/projects', methods=['GET'])
+def list_projects():
+    ensure_default_project()
+    return jsonify(_read_json(_projects_index_path(), []))
+
+
+@library_bp.route('/projects/<project_id>', methods=['GET'])
+def get_project(project_id):
+    project = _read_json(_project_path(project_id))
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    return jsonify(project)
+
+
+@library_bp.route('/projects/<project_id>', methods=['PUT'])
+def update_project(project_id):
+    project = _read_json(_project_path(project_id))
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    if 'name' in data and data['name'].strip():
+        project['name'] = data['name'].strip()
+    if 'art_style' in data:
+        project['art_style'] = data['art_style'].strip()
+    if 'default_resolution' in data:
+        project['default_resolution'] = data['default_resolution']
+
+    _write_json(_project_path(project_id), project)
+
+    # Update projects index name
+    projects = _read_json(_projects_index_path(), [])
+    for p in projects:
+        if p['id'] == project_id:
+            p['name'] = project['name']
+            break
+    _write_json(_projects_index_path(), projects)
+
+    return jsonify(project)
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  ASSET ROUTES
+# ══════════════════════════════════════════════════════════════════════
+
+@library_bp.route('/projects/<project_id>/assets', methods=['GET'])
+def list_assets(project_id):
+    ensure_default_project()
+    assets = _read_json(_assets_index_path(project_id), [])
+    category = request.args.get('category', '').strip()
+    if category:
+        assets = [a for a in assets if a.get('category') == category]
+    return jsonify(assets)
+
+
+@library_bp.route('/projects/<project_id>/assets', methods=['POST'])
+def create_asset(project_id):
+    ensure_default_project()
     data = request.get_json(silent=True) or {}
     name = data.get('name', '').strip()
     if not name:
         return jsonify({'error': 'Name is required'}), 400
 
-    sprite_id = str(uuid.uuid4())
+    category = data.get('category', '').strip()
+    if category not in CATEGORIES:
+        return jsonify({'error': f'Invalid category. Must be one of: {", ".join(CATEGORIES)}'}), 400
+
+    tags = data.get('tags', [])
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(',') if t.strip()]
+
+    asset_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
-    sprite_dir = os.path.join(_lib_root(), sprite_id)
-    os.makedirs(os.path.join(sprite_dir, 'resources'), exist_ok=True)
-    os.makedirs(os.path.join(sprite_dir, 'loops'), exist_ok=True)
+    asset_d = _asset_dir(asset_id)
+    os.makedirs(os.path.join(asset_d, 'resources'), exist_ok=True)
+    os.makedirs(os.path.join(asset_d, 'views'), exist_ok=True)
+    os.makedirs(os.path.join(asset_d, 'videos'), exist_ok=True)
 
-    sprite = {
-        'id': sprite_id,
+    asset = {
+        'id': asset_id,
+        'project_id': project_id,
         'name': name,
+        'category': category,
+        'tags': tags,
         'created': now,
         'resources': [],
-        'loops': [],
+        'views': [],
+        'videos': [],
     }
-    _write_sprite(sprite_id, sprite)
+    _write_json(_asset_path(asset_id), asset)
 
-    # Update index
-    index = _read_index()
+    # Update assets index
+    index = _read_json(_assets_index_path(project_id), [])
     index.append({
-        'id': sprite_id,
+        'id': asset_id,
         'name': name,
-        'created': now,
-        'loop_count': 0,
+        'category': category,
+        'tags': tags,
+        'view_count': 0,
         'resource_count': 0,
+        'created': now,
     })
-    _write_index(index)
+    _write_json(_assets_index_path(project_id), index)
+    _sync_project_asset_count(project_id)
 
-    return jsonify(sprite), 201
-
-
-# ── Get sprite detail ──
-
-@library_bp.route('/library/<sprite_id>', methods=['GET'])
-def get_sprite(sprite_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
-    return jsonify(sprite)
+    return jsonify(asset), 201
 
 
-# ── Update sprite (rename) ──
+@library_bp.route('/assets/<asset_id>', methods=['GET'])
+def get_asset(asset_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+    return jsonify(asset)
 
-@library_bp.route('/library/<sprite_id>', methods=['PUT'])
-def update_sprite(sprite_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+
+@library_bp.route('/assets/<asset_id>', methods=['PUT'])
+def update_asset(asset_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
     data = request.get_json(silent=True) or {}
-    name = data.get('name', '').strip()
-    if name:
-        sprite['name'] = name
-        _write_sprite(sprite_id, sprite)
+    if 'name' in data and data['name'].strip():
+        asset['name'] = data['name'].strip()
+    if 'category' in data:
+        if data['category'] not in CATEGORIES:
+            return jsonify({'error': f'Invalid category. Must be one of: {", ".join(CATEGORIES)}'}), 400
+        asset['category'] = data['category']
+    if 'tags' in data:
+        tags = data['tags']
+        if isinstance(tags, str):
+            tags = [t.strip() for t in tags.split(',') if t.strip()]
+        asset['tags'] = tags
 
-        index = _read_index()
-        for entry in index:
-            if entry['id'] == sprite_id:
-                entry['name'] = name
-                break
-        _write_index(index)
+    _write_json(_asset_path(asset_id), asset)
 
-    return jsonify(sprite)
+    # Update assets index
+    project_id = asset.get('project_id', DEFAULT_PROJECT_ID)
+    index = _read_json(_assets_index_path(project_id), [])
+    for entry in index:
+        if entry['id'] == asset_id:
+            entry['name'] = asset['name']
+            entry['category'] = asset['category']
+            entry['tags'] = asset['tags']
+            break
+    _write_json(_assets_index_path(project_id), index)
+
+    return jsonify(asset)
 
 
-# ── Delete sprite ──
+@library_bp.route('/assets/<asset_id>', methods=['DELETE'])
+def delete_asset(asset_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
-@library_bp.route('/library/<sprite_id>', methods=['DELETE'])
-def delete_sprite(sprite_id):
-    sprite_dir = os.path.join(_lib_root(), sprite_id)
-    if not os.path.isdir(sprite_dir):
-        return jsonify({'error': 'Sprite not found'}), 404
+    project_id = asset.get('project_id', DEFAULT_PROJECT_ID)
 
-    shutil.rmtree(sprite_dir)
+    # Remove asset directory
+    asset_d = _asset_dir(asset_id)
+    if os.path.isdir(asset_d):
+        shutil.rmtree(asset_d)
 
-    index = _read_index()
-    index = [e for e in index if e['id'] != sprite_id]
-    _write_index(index)
+    # Update assets index
+    index = _read_json(_assets_index_path(project_id), [])
+    index = [e for e in index if e['id'] != asset_id]
+    _write_json(_assets_index_path(project_id), index)
+    _sync_project_asset_count(project_id)
 
     return jsonify({'ok': True})
 
 
-# ── Sprite thumbnail ──
-
-@library_bp.route('/library/<sprite_id>/thumbnail', methods=['GET'])
-def get_thumbnail(sprite_id):
-    thumb_path = os.path.join(_lib_root(), sprite_id, 'thumbnail.png')
+@library_bp.route('/assets/<asset_id>/thumbnail', methods=['GET'])
+def get_thumbnail(asset_id):
+    thumb_path = os.path.join(_asset_dir(asset_id), 'thumbnail.png')
     if os.path.exists(thumb_path):
         return send_file(thumb_path, mimetype='image/png')
     # Return a placeholder 1x1 transparent PNG
@@ -182,13 +340,15 @@ def get_thumbnail(sprite_id):
     return send_file(buf, mimetype='image/png')
 
 
-# ── Upload resource ──
+# ══════════════════════════════════════════════════════════════════════
+#  RESOURCE ROUTES
+# ══════════════════════════════════════════════════════════════════════
 
-@library_bp.route('/library/<sprite_id>/resources', methods=['POST'])
-def upload_resource(sprite_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+@library_bp.route('/assets/<asset_id>/resources', methods=['POST'])
+def upload_resource(asset_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
     file = request.files.get('file')
     if not file:
@@ -197,12 +357,18 @@ def upload_resource(sprite_id):
     resource_id = str(uuid.uuid4())
     ext = os.path.splitext(file.filename)[1].lower()
     stored_name = resource_id + ext
-    resource_dir = os.path.join(_lib_root(), sprite_id, 'resources')
+    resource_dir = os.path.join(_asset_dir(asset_id), 'resources')
+    os.makedirs(resource_dir, exist_ok=True)
     file.save(os.path.join(resource_dir, stored_name))
 
-    # Detect type
     video_exts = {'.mp4', '.webm', '.mov', '.avi', '.mkv'}
-    rtype = 'video' if ext in video_exts else 'image'
+    audio_exts = {'.wav', '.mp3', '.ogg', '.flac', '.aac'}
+    if ext in video_exts:
+        rtype = 'video'
+    elif ext in audio_exts:
+        rtype = 'audio'
+    else:
+        rtype = 'image'
 
     resource = {
         'id': resource_id,
@@ -211,74 +377,70 @@ def upload_resource(sprite_id):
         'type': rtype,
         'uploaded': datetime.now(timezone.utc).isoformat(),
     }
-    sprite['resources'].append(resource)
-    _write_sprite(sprite_id, sprite)
-
-    # Update index counts
-    _sync_index_counts(sprite_id, sprite)
+    asset['resources'].append(resource)
+    _write_json(_asset_path(asset_id), asset)
+    _sync_asset_index(asset_id, asset)
 
     return jsonify(resource), 201
 
 
-# ── Delete resource ──
-
-@library_bp.route('/library/<sprite_id>/resources/<resource_id>', methods=['DELETE'])
-def delete_resource(sprite_id, resource_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+@library_bp.route('/assets/<asset_id>/resources/<resource_id>', methods=['DELETE'])
+def delete_resource(asset_id, resource_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
     resource = None
-    for r in sprite['resources']:
+    for r in asset['resources']:
         if r['id'] == resource_id:
             resource = r
             break
     if not resource:
         return jsonify({'error': 'Resource not found'}), 404
 
-    file_path = os.path.join(_lib_root(), sprite_id, 'resources', resource['stored_name'])
+    file_path = os.path.join(_asset_dir(asset_id), 'resources', resource['stored_name'])
     if os.path.exists(file_path):
         os.remove(file_path)
 
-    sprite['resources'] = [r for r in sprite['resources'] if r['id'] != resource_id]
-    _write_sprite(sprite_id, sprite)
-    _sync_index_counts(sprite_id, sprite)
+    asset['resources'] = [r for r in asset['resources'] if r['id'] != resource_id]
+    _write_json(_asset_path(asset_id), asset)
+    _sync_asset_index(asset_id, asset)
 
     return jsonify({'ok': True})
 
 
-# ── Serve resource file ──
-
-@library_bp.route('/library/<sprite_id>/resources/<resource_id>/file', methods=['GET'])
-def serve_resource(sprite_id, resource_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+@library_bp.route('/assets/<asset_id>/resources/<resource_id>/file', methods=['GET'])
+def serve_resource(asset_id, resource_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
     resource = None
-    for r in sprite['resources']:
+    for r in asset['resources']:
         if r['id'] == resource_id:
             resource = r
             break
     if not resource:
         return jsonify({'error': 'Resource not found'}), 404
 
-    resource_dir = os.path.join(_lib_root(), sprite_id, 'resources')
+    resource_dir = os.path.join(_asset_dir(asset_id), 'resources')
     return send_from_directory(resource_dir, resource['stored_name'])
 
 
-# ── Create loop ──
+# ══════════════════════════════════════════════════════════════════════
+#  VIEW ROUTES (replaces loops)
+# ══════════════════════════════════════════════════════════════════════
 
-@library_bp.route('/library/<sprite_id>/loops', methods=['POST'])
-def create_loop(sprite_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+@library_bp.route('/assets/<asset_id>/views', methods=['POST'])
+def create_view(asset_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
-    loop_id = str(uuid.uuid4())
-    name = request.form.get('name', 'Untitled Loop').strip()
-    loop_dir = os.path.join(_lib_root(), sprite_id, 'loops', loop_id)
-    os.makedirs(loop_dir, exist_ok=True)
+    view_id = str(uuid.uuid4())
+    name = request.form.get('name', 'Untitled View').strip()
+    view_d = _view_dir(asset_id, view_id)
+    os.makedirs(view_d, exist_ok=True)
 
     frame_count = 0
     width = 0
@@ -289,16 +451,16 @@ def create_loop(sprite_id):
     if frames:
         for i, f in enumerate(frames):
             frame_name = f'frame_{i + 1:04d}.png'
-            f.save(os.path.join(loop_dir, frame_name))
+            f.save(os.path.join(view_d, frame_name))
             frame_count += 1
-        # Get dimensions from first frame
-        first_frame = Image.open(os.path.join(loop_dir, 'frame_0001.png'))
-        width = first_frame.width
-        height = first_frame.height
+        if frame_count > 0:
+            first_frame = Image.open(os.path.join(view_d, 'frame_0001.png'))
+            width = first_frame.width
+            height = first_frame.height
 
     # Mode 2: copy from a session (Video to Frames output)
     session_id = request.form.get('session_id')
-    source_folder = request.form.get('source', 'transparent')  # 'transparent' or 'original'
+    source_folder = request.form.get('source', 'transparent')
     if session_id and not frames:
         src_dir = os.path.join(current_app.config['OUTPUT_FOLDER'], session_id, source_folder)
         if not os.path.isdir(src_dir):
@@ -307,113 +469,112 @@ def create_loop(sprite_id):
             src_frames = sorted(f for f in os.listdir(src_dir) if f.startswith('frame_') and f.endswith('.png'))
             for i, fname in enumerate(src_frames):
                 dest_name = f'frame_{i + 1:04d}.png'
-                shutil.copy2(os.path.join(src_dir, fname), os.path.join(loop_dir, dest_name))
+                shutil.copy2(os.path.join(src_dir, fname), os.path.join(view_d, dest_name))
                 frame_count += 1
             if frame_count > 0:
-                first_frame = Image.open(os.path.join(loop_dir, 'frame_0001.png'))
+                first_frame = Image.open(os.path.join(view_d, 'frame_0001.png'))
                 width = first_frame.width
                 height = first_frame.height
 
     delay = int(request.form.get('delay', 100))
 
-    loop_meta = {
-        'id': loop_id,
+    # Auto-assign ags_loop as max existing + 1
+    existing_loops = [v.get('ags_loop', -1) for v in asset.get('views', [])]
+    ags_loop = max(existing_loops, default=-1) + 1
+
+    view_meta = {
+        'id': view_id,
         'name': name,
+        'ags_loop': ags_loop,
         'frame_count': frame_count,
         'width': width,
         'height': height,
         'delay': delay,
     }
 
-    # Save loop.json
-    loop_json_path = os.path.join(loop_dir, 'loop.json')
-    with open(loop_json_path, 'w') as f:
-        json.dump(loop_meta, f, indent=2)
+    # Save view.json
+    _write_json(os.path.join(view_d, 'view.json'), view_meta)
 
-    sprite['loops'].append(loop_meta)
-    _write_sprite(sprite_id, sprite)
-    _sync_index_counts(sprite_id, sprite)
-    _generate_thumbnail(sprite_id)
+    asset['views'].append(view_meta)
+    _write_json(_asset_path(asset_id), asset)
+    _sync_asset_index(asset_id, asset)
+    _generate_thumbnail(asset_id)
 
-    return jsonify(loop_meta), 201
+    return jsonify(view_meta), 201
 
 
-# ── Get loop metadata ──
-
-@library_bp.route('/library/<sprite_id>/loops/<loop_id>', methods=['GET'])
-def get_loop(sprite_id, loop_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
-    for loop in sprite.get('loops', []):
-        if loop['id'] == loop_id:
-            return jsonify(loop)
-    return jsonify({'error': 'Loop not found'}), 404
+@library_bp.route('/assets/<asset_id>/views/<view_id>', methods=['GET'])
+def get_view(asset_id, view_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+    for view in asset.get('views', []):
+        if view['id'] == view_id:
+            return jsonify(view)
+    return jsonify({'error': 'View not found'}), 404
 
 
-# ── Update loop (rename) ──
-
-@library_bp.route('/library/<sprite_id>/loops/<loop_id>', methods=['PUT'])
-def update_loop(sprite_id, loop_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+@library_bp.route('/assets/<asset_id>/views/<view_id>', methods=['PUT'])
+def update_view(asset_id, view_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
     data = request.get_json(silent=True) or {}
-    name = data.get('name', '').strip()
 
-    for loop in sprite['loops']:
-        if loop['id'] == loop_id:
-            if name:
-                loop['name'] = name
-            _write_sprite(sprite_id, sprite)
-            return jsonify(loop)
+    for view in asset['views']:
+        if view['id'] == view_id:
+            if 'name' in data and data['name'].strip():
+                view['name'] = data['name'].strip()
+            if 'ags_loop' in data:
+                view['ags_loop'] = int(data['ags_loop'])
+            if 'delay' in data:
+                view['delay'] = int(data['delay'])
+            _write_json(_asset_path(asset_id), asset)
+            _write_json(os.path.join(_view_dir(asset_id, view_id), 'view.json'), view)
+            return jsonify(view)
 
-    return jsonify({'error': 'Loop not found'}), 404
+    return jsonify({'error': 'View not found'}), 404
 
 
-# ── Delete loop ──
+@library_bp.route('/assets/<asset_id>/views/<view_id>', methods=['DELETE'])
+def delete_view(asset_id, view_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
-@library_bp.route('/library/<sprite_id>/loops/<loop_id>', methods=['DELETE'])
-def delete_loop(sprite_id, loop_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+    view_d = _view_dir(asset_id, view_id)
+    if os.path.isdir(view_d):
+        shutil.rmtree(view_d)
 
-    loop_dir = os.path.join(_lib_root(), sprite_id, 'loops', loop_id)
-    if os.path.isdir(loop_dir):
-        shutil.rmtree(loop_dir)
-
-    sprite['loops'] = [l for l in sprite['loops'] if l['id'] != loop_id]
-    _write_sprite(sprite_id, sprite)
-    _sync_index_counts(sprite_id, sprite)
-    _generate_thumbnail(sprite_id)
+    asset['views'] = [v for v in asset['views'] if v['id'] != view_id]
+    _write_json(_asset_path(asset_id), asset)
+    _sync_asset_index(asset_id, asset)
+    _generate_thumbnail(asset_id)
 
     return jsonify({'ok': True})
 
 
-# ── Serve individual frame ──
-
-@library_bp.route('/library/<sprite_id>/loops/<loop_id>/frames/<filename>', methods=['GET'])
-def serve_frame(sprite_id, loop_id, filename):
-    frame_dir = os.path.join(_lib_root(), sprite_id, 'loops', loop_id)
-    if not os.path.isdir(frame_dir):
-        return jsonify({'error': 'Loop not found'}), 404
-    return send_from_directory(frame_dir, filename)
+@library_bp.route('/assets/<asset_id>/views/<view_id>/frames/<filename>', methods=['GET'])
+def serve_frame(asset_id, view_id, filename):
+    view_d = _view_dir(asset_id, view_id)
+    if not os.path.isdir(view_d):
+        return jsonify({'error': 'View not found'}), 404
+    return send_from_directory(view_d, filename)
 
 
-@library_bp.route('/library/<sprite_id>/loops/<loop_id>/frames/<filename>', methods=['PUT'])
-def overwrite_frame(sprite_id, loop_id, filename):
-    """Overwrite a single frame image in a loop."""
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+@library_bp.route('/assets/<asset_id>/views/<view_id>/frames/<filename>', methods=['PUT'])
+def overwrite_frame(asset_id, view_id, filename):
+    """Overwrite a single frame image in a view."""
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
-    loop_dir = os.path.join(_lib_root(), sprite_id, 'loops', loop_id)
-    if not os.path.isdir(loop_dir):
-        return jsonify({'error': 'Loop not found'}), 404
+    view_d = _view_dir(asset_id, view_id)
+    if not os.path.isdir(view_d):
+        return jsonify({'error': 'View not found'}), 404
 
-    frame_path = os.path.join(loop_dir, filename)
+    frame_path = os.path.join(view_d, filename)
     if not os.path.exists(frame_path):
         return jsonify({'error': 'Frame not found'}), 404
 
@@ -422,67 +583,107 @@ def overwrite_frame(sprite_id, loop_id, filename):
         return jsonify({'error': 'No image provided'}), 400
 
     f.save(frame_path)
-    _generate_thumbnail(sprite_id)
+    _generate_thumbnail(asset_id)
     return jsonify({'ok': True})
 
 
-# ── Download loop as ZIP ──
+@library_bp.route('/assets/<asset_id>/views/<view_id>/download', methods=['GET'])
+def download_view(asset_id, view_id):
+    view_d = _view_dir(asset_id, view_id)
+    if not os.path.isdir(view_d):
+        return jsonify({'error': 'View not found'}), 404
 
-@library_bp.route('/library/<sprite_id>/loops/<loop_id>/download', methods=['GET'])
-def download_loop(sprite_id, loop_id):
-    loop_dir = os.path.join(_lib_root(), sprite_id, 'loops', loop_id)
-    if not os.path.isdir(loop_dir):
-        return jsonify({'error': 'Loop not found'}), 404
-
-    sprite = _read_sprite(sprite_id)
-    loop_name = loop_id[:8]
-    if sprite:
-        for loop in sprite.get('loops', []):
-            if loop['id'] == loop_id:
-                loop_name = loop['name'].replace(' ', '_')
+    asset = _read_json(_asset_path(asset_id))
+    view_name = view_id[:8]
+    if asset:
+        for view in asset.get('views', []):
+            if view['id'] == view_id:
+                view_name = view['name'].replace(' ', '_')
                 break
 
-    frames = sorted(f for f in os.listdir(loop_dir) if f.startswith('frame_') and f.endswith('.png'))
+    frames = sorted(f for f in os.listdir(view_d) if f.startswith('frame_') and f.endswith('.png'))
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for f in frames:
-            zf.write(os.path.join(loop_dir, f), f)
+            zf.write(os.path.join(view_d, f), f)
     buf.seek(0)
     return send_file(buf, mimetype='application/zip', as_attachment=True,
-                     download_name=f'{loop_name}.zip')
+                     download_name=f'{view_name}.zip')
 
 
-# ── Download all loops as ZIP ──
-
-@library_bp.route('/library/<sprite_id>/download', methods=['GET'])
-def download_sprite(sprite_id):
-    sprite = _read_sprite(sprite_id)
-    if not sprite:
-        return jsonify({'error': 'Sprite not found'}), 404
+@library_bp.route('/assets/<asset_id>/download', methods=['GET'])
+def download_asset(asset_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for loop in sprite.get('loops', []):
-            loop_dir = os.path.join(_lib_root(), sprite_id, 'loops', loop['id'])
-            if not os.path.isdir(loop_dir):
+        for view in asset.get('views', []):
+            view_d = _view_dir(asset_id, view['id'])
+            if not os.path.isdir(view_d):
                 continue
-            folder_name = loop['name'].replace(' ', '_')
-            frames = sorted(f for f in os.listdir(loop_dir) if f.startswith('frame_') and f.endswith('.png'))
+            folder_name = view['name'].replace(' ', '_')
+            frames = sorted(f for f in os.listdir(view_d) if f.startswith('frame_') and f.endswith('.png'))
             for f in frames:
-                zf.write(os.path.join(loop_dir, f), os.path.join(folder_name, f))
+                zf.write(os.path.join(view_d, f), os.path.join(folder_name, f))
     buf.seek(0)
 
-    sprite_name = sprite['name'].replace(' ', '_')
+    asset_name = asset['name'].replace(' ', '_')
     return send_file(buf, mimetype='application/zip', as_attachment=True,
-                     download_name=f'{sprite_name}_all_loops.zip')
+                     download_name=f'{asset_name}_all_views.zip')
 
 
-def _sync_index_counts(sprite_id, sprite):
-    """Keep index loop/resource counts in sync."""
-    index = _read_index()
-    for entry in index:
-        if entry['id'] == sprite_id:
-            entry['loop_count'] = len(sprite.get('loops', []))
-            entry['resource_count'] = len(sprite.get('resources', []))
-            break
-    _write_index(index)
+# ══════════════════════════════════════════════════════════════════════
+#  VIDEO ROUTES (serve saved videos from asset)
+# ══════════════════════════════════════════════════════════════════════
+
+@library_bp.route('/assets/<asset_id>/export-ags', methods=['GET'])
+def export_ags(asset_id):
+    """Download asset as AGS-structured ZIP with zero-indexed frames."""
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+
+    asset_name = asset['name'].replace(' ', '_')
+    views = asset.get('views', [])
+
+    # Build view.json metadata
+    view_meta = {
+        'asset_name': asset['name'],
+        'asset_id': asset_id,
+        'loops': [],
+    }
+    for v in views:
+        view_meta['loops'].append({
+            'ags_loop': v.get('ags_loop', 0),
+            'name': v['name'],
+            'frame_count': v.get('frame_count', 0),
+            'width': v.get('width', 0),
+            'height': v.get('height', 0),
+            'delay': v.get('delay', 100),
+        })
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(os.path.join(asset_name, 'view.json'), json.dumps(view_meta, indent=2))
+
+        for v in views:
+            view_d = _view_dir(asset_id, v['id'])
+            if not os.path.isdir(view_d):
+                continue
+            folder = f"loop_{v.get('ags_loop', 0)}_{v['name'].replace(' ', '_')}"
+            frames = sorted(f for f in os.listdir(view_d) if f.startswith('frame_') and f.endswith('.png'))
+            for i, f in enumerate(frames):
+                ags_name = f'frame_{i:04d}.png'
+                zf.write(os.path.join(view_d, f), os.path.join(asset_name, folder, ags_name))
+
+    buf.seek(0)
+    return send_file(buf, mimetype='application/zip', as_attachment=True,
+                     download_name=f'{asset_name}_ags.zip')
+
+
+@library_bp.route('/assets/<asset_id>/videos/<video_id>', methods=['GET'])
+def serve_video(asset_id, video_id):
+    video_dir = os.path.join(_asset_dir(asset_id), 'videos')
+    return send_from_directory(video_dir, f'{video_id}.mp4')

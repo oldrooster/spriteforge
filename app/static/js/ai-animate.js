@@ -62,15 +62,15 @@
                 var loop = result.items[0];
                 var sprite = result.sprite;
                 selectedSprite = {
-                    sprite_id: sprite.id,
-                    sprite_name: sprite.name,
-                    loop_id: loop.id,
-                    loop_name: loop.name,
+                    asset_id: sprite.id,
+                    asset_name: sprite.name,
+                    view_id: loop.id,
+                    view_name: loop.name,
                     frame_index: 1,
                     frame_count: loop.frame_count || 1,
                 };
 
-                var baseUrl = '/api/library/' + sprite.id + '/loops/' + loop.id + '/frames/';
+                var baseUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/';
                 sourceImg.src = baseUrl + 'frame_0001.png';
                 sourceWrap.hidden = false;
                 dropzone.hidden = true;
@@ -128,8 +128,8 @@
                     prompt: promptInput.value.trim(),
                     model: modelSelect.value,
                     duration: parseInt(document.getElementById('ai-animate-duration').value, 10),
-                    sprite_id: selectedSprite.sprite_id,
-                    loop_id: selectedSprite.loop_id,
+                    asset_id: selectedSprite.asset_id,
+                    view_id: selectedSprite.view_id,
                     frame_index: selectedSprite.frame_index,
                     generate_audio: document.getElementById('ai-animate-audio').checked,
                 }),
@@ -186,7 +186,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     session_id: sessionId,
-                    sprite_id: selectedSprite.sprite_id,
+                    asset_id: selectedSprite.asset_id,
                     video_name: videoNameInput.value.trim() || 'AI Animation',
                 }),
             });

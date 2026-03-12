@@ -357,13 +357,13 @@
                         for (const loopItem of result.items) {
                             for (let i = 1; i <= loopItem.frame_count; i++) {
                                 const frameName = `frame_${String(i).padStart(4, '0')}.png`;
-                                const frameUrl = `/api/library/${result.sprite.id}/loops/${loopItem.id}/frames/${frameName}`;
+                                const frameUrl = `/api/assets/${result.sprite.id}/views/${loopItem.id}/frames/${frameName}`;
                                 try {
                                     const resp = await fetch(frameUrl);
                                     const blob = await resp.blob();
                                     const fileName = `${loopItem.name.replace(/\s+/g, '_')}_frame_${String(i).padStart(4, '0')}.png`;
                                     newFiles.push(new File([blob], fileName, { type: 'image/png' }));
-                                    frameNames.push({ loop_id: loopItem.id, filename: frameName });
+                                    frameNames.push({ view_id: loopItem.id, filename: frameName });
                                 } catch (err) {
                                     console.error('Failed to fetch frame:', err);
                                 }
@@ -371,7 +371,7 @@
                         }
                         if (newFiles.length > 0) {
                             librarySource = {
-                                sprite_id: result.sprite.id,
+                                asset_id: result.sprite.id,
                                 frames: frameNames,
                             };
                             handleFiles(newFiles);
@@ -395,7 +395,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         session_id: resizeSessionId,
-                        sprite_id: librarySource.sprite_id,
+                        asset_id: librarySource.asset_id,
                         frames: librarySource.frames,
                     }),
                 });

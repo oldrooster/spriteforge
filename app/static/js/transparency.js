@@ -637,16 +637,16 @@
             if (!state.sessionId) return;
             if (typeof window.openSaveModal === 'function') {
                 window.openSaveModal({
-                    defaultLoopName: 'Untitled Loop',
-                    onSave: async (spriteId, loopName) => {
+                    defaultViewName: 'Untitled View',
+                    onSave: async (assetId, viewName) => {
                         const source = state.transparentFrames ? 'transparent' : 'original';
                         const formData = new FormData();
-                        formData.append('name', loopName);
+                        formData.append('name', viewName);
                         formData.append('session_id', state.sessionId);
                         formData.append('source', source);
                         formData.append('delay', state.animationDelay || 100);
 
-                        const resp = await fetch(`/api/library/${spriteId}/loops`, {
+                        const resp = await fetch(`/api/assets/${assetId}/views`, {
                             method: 'POST',
                             body: formData,
                         });

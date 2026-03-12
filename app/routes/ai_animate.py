@@ -335,21 +335,21 @@ def animate():
     prompt = data.get('prompt', '').strip()
     default_model = 'veo-3.1-generate-001' if _is_vertex() else 'veo-2.0-generate-001'
     model_name = data.get('model', default_model)
-    sprite_id = data.get('sprite_id')
-    loop_id = data.get('loop_id')
+    asset_id = data.get('asset_id')
+    view_id = data.get('view_id')
     frame_index = data.get('frame_index', 1)
     duration = int(data.get('duration', 4))
     generate_audio = bool(data.get('generate_audio', False))
 
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
-    if not sprite_id or not loop_id:
-        return jsonify({'error': 'sprite_id and loop_id are required'}), 400
+    if not asset_id or not view_id:
+        return jsonify({'error': 'asset_id and view_id are required'}), 400
 
     # Find the source image in the library
     lib_root = current_app.config['LIBRARY_FOLDER']
     frame_name = f'frame_{int(frame_index):04d}.png'
-    image_path = os.path.join(lib_root, sprite_id, 'loops', loop_id, frame_name)
+    image_path = os.path.join(lib_root, 'assets', asset_id, 'views', view_id, frame_name)
 
     if not os.path.exists(image_path):
         return jsonify({'error': f'Source frame not found: {frame_name}'}), 404
@@ -411,23 +411,23 @@ def serve_video(session_id, filename):
     return send_from_directory(session_dir, filename)
 
 
-@ai_animate_bp.route('/ai-animate/library-video/<sprite_id>/<video_id>', methods=['GET'])
-def serve_library_video(sprite_id, video_id):
-    """Serve a saved video from the sprite library."""
-    video_dir = os.path.join(current_app.config['LIBRARY_FOLDER'], sprite_id, 'videos')
+@ai_animate_bp.route('/ai-animate/library-video/<asset_id>/<video_id>', methods=['GET'])
+def serve_library_video(asset_id, video_id):
+    """Serve a saved video from the asset library."""
+    video_dir = os.path.join(current_app.config['LIBRARY_FOLDER'], 'assets', asset_id, 'videos')
     return send_from_directory(video_dir, f'{video_id}.mp4')
 
 
 @ai_animate_bp.route('/ai-animate/save-video-to-library', methods=['POST'])
 def save_video_to_library():
-    """Save the generated video file directly to the sprite library."""
+    """Save the generated video file directly to the asset library."""
     data = request.get_json(force=True)
     session_id = data.get('session_id')
-    sprite_id = data.get('sprite_id')
+    asset_id = data.get('asset_id')
     video_name = data.get('video_name', 'AI Animation').strip() or 'AI Animation'
 
-    if not session_id or not sprite_id:
-        return jsonify({'error': 'session_id and sprite_id are required'}), 400
+    if not session_id or not asset_id:
+        return jsonify({'error': 'session_id and asset_id are required'}), 400
 
     session_dir = os.path.join(current_app.config['OUTPUT_FOLDER'], session_id, 'ai_animate')
     video_path = os.path.join(session_dir, 'output.mp4')
@@ -436,13 +436,13 @@ def save_video_to_library():
         return jsonify({'error': 'Video not found'}), 404
 
     lib_root = current_app.config['LIBRARY_FOLDER']
-    sprite_path = os.path.join(lib_root, sprite_id, 'sprite.json')
-    if not os.path.exists(sprite_path):
-        return jsonify({'error': 'Sprite not found'}), 404
+    asset_path = os.path.join(lib_root, 'assets', asset_id, 'asset.json')
+    if not os.path.exists(asset_path):
+        return jsonify({'error': 'Asset not found'}), 404
 
     try:
         video_id = str(uuid.uuid4())
-        video_dir = os.path.join(lib_root, sprite_id, 'videos')
+        video_dir = os.path.join(lib_root, 'assets', asset_id, 'videos')
         os.makedirs(video_dir, exist_ok=True)
 
         dest_path = os.path.join(video_dir, f'{video_id}.mp4')
@@ -455,16 +455,16 @@ def save_video_to_library():
             'created': datetime.now(timezone.utc).isoformat(),
         }
 
-        # Update sprite.json
-        with open(sprite_path) as f:
-            sprite = json.load(f)
-        if 'videos' not in sprite:
-            sprite['videos'] = []
-        sprite['videos'].append(video_meta)
-        tmp = sprite_path + '.tmp'
+        # Update asset.json
+        with open(asset_path) as f:
+            asset = json.load(f)
+        if 'videos' not in asset:
+            asset['videos'] = []
+        asset['videos'].append(video_meta)
+        tmp = asset_path + '.tmp'
         with open(tmp, 'w') as f:
-            json.dump(sprite, f, indent=2)
-        os.replace(tmp, sprite_path)
+            json.dump(asset, f, indent=2)
+        os.replace(tmp, asset_path)
 
         return jsonify({'ok': True, 'video_id': video_id})
 
@@ -476,12 +476,12 @@ def save_video_to_library():
 def save_to_library():
     data = request.get_json(force=True)
     session_id = data.get('session_id')
-    sprite_id = data.get('sprite_id')
-    loop_name = data.get('loop_name', 'AI Animation')
+    asset_id = data.get('asset_id')
+    view_name = data.get('view_name', 'AI Animation')
     frame_count = int(data.get('frame_count', 8))
 
-    if not session_id or not sprite_id:
-        return jsonify({'error': 'session_id and sprite_id are required'}), 400
+    if not session_id or not asset_id:
+        return jsonify({'error': 'session_id and asset_id are required'}), 400
 
     session_dir = os.path.join(current_app.config['OUTPUT_FOLDER'], session_id, 'ai_animate')
     video_path = os.path.join(session_dir, 'output.mp4')
@@ -490,14 +490,14 @@ def save_to_library():
         return jsonify({'error': 'Video not found'}), 404
 
     lib_root = current_app.config['LIBRARY_FOLDER']
-    sprite_path = os.path.join(lib_root, sprite_id, 'sprite.json')
-    if not os.path.exists(sprite_path):
-        return jsonify({'error': 'Sprite not found'}), 404
+    asset_path = os.path.join(lib_root, 'assets', asset_id, 'asset.json')
+    if not os.path.exists(asset_path):
+        return jsonify({'error': 'Asset not found'}), 404
 
     # Extract frames from video using FFmpeg
-    loop_id = str(uuid.uuid4())
-    loop_dir = os.path.join(lib_root, sprite_id, 'loops', loop_id)
-    os.makedirs(loop_dir, exist_ok=True)
+    view_id = str(uuid.uuid4())
+    view_dir = os.path.join(lib_root, 'assets', asset_id, 'views', view_id)
+    os.makedirs(view_dir, exist_ok=True)
 
     try:
         # Get video duration
@@ -518,52 +518,57 @@ def save_to_library():
             '-vf', f'fps={fps_value}',
             '-frames:v', str(frame_count),
             '-pix_fmt', 'rgba',
-            os.path.join(loop_dir, 'frame_%04d.png'),
+            os.path.join(view_dir, 'frame_%04d.png'),
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if result.returncode != 0:
             raise RuntimeError(f'FFmpeg failed: {result.stderr}')
 
-        frames = sorted(f for f in os.listdir(loop_dir) if f.startswith('frame_') and f.endswith('.png'))
+        frames = sorted(f for f in os.listdir(view_dir) if f.startswith('frame_') and f.endswith('.png'))
         if not frames:
             raise RuntimeError('No frames extracted')
 
         # Get dimensions from first frame
         from PIL import Image
-        first = Image.open(os.path.join(loop_dir, frames[0]))
+        first = Image.open(os.path.join(view_dir, frames[0]))
         width, height = first.size
 
-        # Write loop metadata
-        loop_meta = {
-            'id': loop_id,
-            'name': loop_name,
+        # Auto-increment ags_loop
+        with open(asset_path) as f:
+            asset = json.load(f)
+        existing_ags = [v.get('ags_loop', 0) for v in asset.get('views', [])]
+        next_ags = max(existing_ags, default=-1) + 1
+
+        # Write view metadata
+        view_meta = {
+            'id': view_id,
+            'name': view_name,
+            'ags_loop': next_ags,
             'frame_count': len(frames),
             'width': width,
             'height': height,
             'delay': 100,
             'created': datetime.now(timezone.utc).isoformat(),
         }
-        meta_path = os.path.join(loop_dir, 'loop.json')
+        meta_path = os.path.join(view_dir, 'view.json')
         with open(meta_path, 'w') as f:
-            json.dump(loop_meta, f, indent=2)
+            json.dump(view_meta, f, indent=2)
 
-        # Update sprite.json
-        with open(sprite_path) as f:
-            sprite = json.load(f)
-        sprite['loops'].append(loop_meta)
-        tmp = sprite_path + '.tmp'
+        # Update asset.json
+        asset['views'].append(view_meta)
+        tmp = asset_path + '.tmp'
         with open(tmp, 'w') as f:
-            json.dump(sprite, f, indent=2)
-        os.replace(tmp, sprite_path)
+            json.dump(asset, f, indent=2)
+        os.replace(tmp, asset_path)
 
-        # Sync index counts
-        index_path = os.path.join(lib_root, 'sprites.json')
+        # Sync project asset index counts
+        index_path = os.path.join(lib_root, 'projects', 'default', 'assets.json')
         if os.path.exists(index_path):
             with open(index_path) as f:
                 index = json.load(f)
             for entry in index:
-                if entry['id'] == sprite_id:
-                    entry['loop_count'] = len(sprite.get('loops', []))
+                if entry['id'] == asset_id:
+                    entry['view_count'] = len(asset.get('views', []))
                     break
             tmp = index_path + '.tmp'
             with open(tmp, 'w') as f:
@@ -572,12 +577,12 @@ def save_to_library():
 
         return jsonify({
             'ok': True,
-            'loop_id': loop_id,
+            'view_id': view_id,
             'frame_count': len(frames),
         })
 
     except Exception as e:
         # Clean up on failure
-        if os.path.isdir(loop_dir):
-            shutil.rmtree(loop_dir, ignore_errors=True)
+        if os.path.isdir(view_dir):
+            shutil.rmtree(view_dir, ignore_errors=True)
         return jsonify({'error': str(e)}), 500

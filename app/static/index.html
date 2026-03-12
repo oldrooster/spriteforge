@@ -7,87 +7,46 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <header>
-        <button id="sidebar-toggle" class="btn btn-secondary btn-small sidebar-toggle" title="Toggle sidebar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-            </svg>
-        </button>
+    <header class="project-header">
         <h1>Sprite Forge</h1>
+        <div class="header-actions">
+            <input type="text" id="header-search" class="header-search" placeholder="Search assets...">
+            <button id="header-new-asset-btn" class="btn btn-primary btn-small">+ New Asset</button>
+            <button id="header-settings-btn" class="btn btn-secondary btn-small" title="Project Settings">&#9881;</button>
+        </div>
     </header>
 
     <div class="app-layout">
-        <!-- Sidebar Navigation -->
-        <nav id="sidebar" class="sidebar">
-            <ul class="sidebar-nav">
-                <li class="sidebar-item active" data-tool="video-to-frames">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                        <line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/>
-                        <line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/>
-                        <line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>
-                        <line x1="17" y1="17" x2="22" y2="17"/>
-                    </svg>
-                    <span class="sidebar-label">Video to Frames</span>
-                </li>
-                <li class="sidebar-item" data-tool="resize-images">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
-                        <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
-                    </svg>
-                    <span class="sidebar-label">Resize Images</span>
-                </li>
-                <li class="sidebar-item" data-tool="crop-image">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M6 2v4H2"/><path d="M18 22v-4h4"/>
-                        <rect x="6" y="6" width="12" height="12"/>
-                    </svg>
-                    <span class="sidebar-label">Crop Image</span>
-                </li>
-                <li class="sidebar-item" data-tool="make-transparent">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <path d="M3 3l18 18"/><path d="M12 3v18"/><path d="M3 12h18"/>
-                    </svg>
-                    <span class="sidebar-label">Make Transparent</span>
-                </li>
-                <li class="sidebar-item" data-tool="sprite-library">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                        <line x1="9" y1="7" x2="15" y2="7"/>
-                        <line x1="9" y1="11" x2="13" y2="11"/>
-                    </svg>
-                    <span class="sidebar-label">Sprite Library</span>
-                </li>
-                <li class="sidebar-item" data-tool="ai-generate">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M12 2l3 7h7l-5.5 4.5 2 7L12 16l-6.5 4.5 2-7L2 9h7z"/>
-                    </svg>
-                    <span class="sidebar-label">AI Generate</span>
-                </li>
-                <li class="sidebar-item" data-tool="ai-animate">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
-                        <circle cx="19" cy="5" r="2.5" fill="currentColor" stroke="none"/>
-                    </svg>
-                    <span class="sidebar-label">AI Animate</span>
-                </li>
-            </ul>
-            <div class="sidebar-footer">
-                <button id="sidebar-collapse-btn" class="btn btn-secondary btn-small" title="Collapse sidebar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="15 18 9 12 15 6"/>
-                    </svg>
-                </button>
-            </div>
-        </nav>
-
-        <!-- Content Area -->
         <div class="content-area">
 
+            <!-- Project Home (asset grid — built in Phase 5) -->
+            <div class="view-panel" id="project-home">
+                <div id="project-home-content">
+                    <div class="library-empty" id="project-home-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                        <p>No assets yet</p>
+                        <span class="hint">Click "+ New Asset" to create your first asset</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Asset Detail (built in Phase 6) -->
+            <div class="view-panel" id="asset-detail">
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-home-btn" onclick="navigateBack()">&larr; Back to Assets</button>
+                </div>
+                <div id="asset-detail-content"></div>
+            </div>
+
             <!-- Tool: Video to Frames -->
-            <div class="tool-panel active" id="tool-video-to-frames">
+            <div class="tool-panel" id="tool-video-to-frames">
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">Video to Frames</span>
+                </div>
                 <div class="wizard-header">
                     <div class="step-indicator">
                         <div class="step-dot active" data-step="0"><span>1</span><label>Upload</label></div>
@@ -113,7 +72,7 @@
                                 </svg>
                                 <p>Drop video here or click to browse</p>
                                 <span class="hint">.mp4 .webm .mov .avi .mkv</span>
-                                <button id="upload-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Sprite Library</button>
+                                <button id="upload-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Library</button>
                             </div>
                             <input type="file" id="file-input" accept=".mp4,.webm,.mov,.avi,.mkv" hidden>
                         </div>
@@ -358,7 +317,7 @@
                                 </div>
                                 <hr>
                                 <button id="download-btn" class="btn btn-accent">Download ZIP</button>
-                                <button id="save-to-library-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Save to Sprite Library</button>
+                                <button id="save-to-library-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Save to Library</button>
                             </div>
                         </div>
                     </section>
@@ -374,7 +333,10 @@
 
             <!-- Tool: Make Transparent -->
             <div class="tool-panel" id="tool-make-transparent">
-                <h2>Make Transparent</h2>
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">Make Transparent</span>
+                </div>
                 <div class="transparency-layout">
                     <div class="transparency-preview">
                         <div id="img-trans-dropzone" class="dropzone">
@@ -386,7 +348,7 @@
                                 </svg>
                                 <p>Drop an image here or click to browse</p>
                                 <span class="hint">.png .jpg .jpeg .webp .gif</span>
-                                <button id="img-trans-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Sprite Library</button>
+                                <button id="img-trans-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Library</button>
                             </div>
                             <input type="file" id="img-trans-file-input" accept=".png,.jpg,.jpeg,.webp,.gif" hidden>
                         </div>
@@ -474,75 +436,17 @@
                         </div>
                         <hr>
                         <button id="img-trans-download-btn" class="btn btn-accent">Download PNG</button>
-                        <button id="img-trans-save-library-btn" class="btn btn-primary" hidden>Save to Sprite Library</button>
+                        <button id="img-trans-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
                     </div>
-                </div>
-            </div>
-
-            <!-- Tool: Sprite Library -->
-            <div class="tool-panel" id="tool-sprite-library">
-                <!-- Library Grid View -->
-                <div id="library-grid-view">
-                    <div class="library-header">
-                        <h2>Sprite Library</h2>
-                        <div class="library-actions">
-                            <input type="text" id="library-search" class="library-search" placeholder="Search sprites...">
-                            <button id="library-new-btn" class="btn btn-primary btn-small">+ New Sprite</button>
-                        </div>
-                    </div>
-                    <div id="library-sprites-grid" class="sprites-grid">
-                        <div class="library-empty" id="library-empty">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                            </svg>
-                            <p>No sprites yet</p>
-                            <span class="hint">Click "+ New Sprite" to create your first sprite</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sprite Detail View -->
-                <div id="library-detail-view" hidden>
-                    <div class="library-detail-header">
-                        <button id="library-back-btn" class="btn btn-secondary btn-small">Back</button>
-                        <h2 id="library-sprite-name">Sprite Name</h2>
-                        <div class="library-detail-actions">
-                            <button id="library-rename-btn" class="btn btn-secondary btn-small">Rename</button>
-                            <button id="library-delete-sprite-btn" class="btn btn-secondary btn-small" style="color: var(--accent);">Delete</button>
-                        </div>
-                    </div>
-
-                    <div class="library-detail-section">
-                        <div class="library-section-header">
-                            <h3>Resources</h3>
-                            <label class="btn btn-secondary btn-small">
-                                + Upload Resource
-                                <input type="file" id="library-resource-input" accept=".mp4,.webm,.mov,.avi,.mkv,.png,.jpg,.jpeg,.webp,.gif" multiple hidden>
-                            </label>
-                        </div>
-                        <div id="library-resources-list" class="library-resources-list">
-                            <span class="hint" id="library-no-resources">No resources uploaded</span>
-                        </div>
-                    </div>
-
-                    <div class="library-detail-section">
-                        <div class="library-section-header">
-                            <h3>Loops</h3>
-                            <button id="library-new-loop-btn" class="btn btn-secondary btn-small">+ New Loop</button>
-                        </div>
-                        <div id="library-loops-list" class="library-loops-list">
-                            <span class="hint" id="library-no-loops">No loops yet</span>
-                        </div>
-                    </div>
-
-                    <button id="library-download-all-btn" class="btn btn-accent" style="margin-top: 16px;">Download All Loops as ZIP</button>
                 </div>
             </div>
 
             <!-- Tool: Resize Images -->
             <div class="tool-panel" id="tool-resize-images">
-                <h2>Resize Images</h2>
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">Resize Images</span>
+                </div>
                 <div class="resize-layout">
                     <div class="resize-upload-area">
                         <div id="resize-dropzone" class="dropzone">
@@ -554,7 +458,7 @@
                                 </svg>
                                 <p>Drop images here or click to browse</p>
                                 <span class="hint">.png .jpg .jpeg .webp .gif (multiple files supported)</span>
-                                <button id="resize-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Import from Sprite Library</button>
+                                <button id="resize-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Import from Library</button>
                             </div>
                             <input type="file" id="resize-file-input" accept=".png,.jpg,.jpeg,.webp,.gif" multiple hidden>
                         </div>
@@ -644,14 +548,17 @@
                             <div class="progress-fill indeterminate"></div>
                         </div>
                         <button id="resize-download-btn" class="btn btn-accent" hidden>Download Resized ZIP</button>
-                        <button id="resize-save-library-btn" class="btn btn-primary" hidden>Save to Sprite Library</button>
+                        <button id="resize-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
                     </div>
                 </div>
             </div>
 
             <!-- Tool: Crop Image -->
             <div class="tool-panel" id="tool-crop-image">
-                <h2>Crop Image</h2>
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">Crop Image</span>
+                </div>
                 <div class="crop-tool-layout">
                     <div class="crop-upload-area">
                         <div id="crop-dropzone" class="dropzone">
@@ -662,7 +569,7 @@
                                 </svg>
                                 <p>Drop an image here or click to browse</p>
                                 <span class="hint">.png .jpg .jpeg .webp .gif</span>
-                                <button id="crop-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Sprite Library</button>
+                                <button id="crop-from-library-btn" class="btn btn-secondary btn-small" style="margin-top: 12px;" type="button">Select from Library</button>
                             </div>
                             <input type="file" id="crop-file-input" accept=".png,.jpg,.jpeg,.webp,.gif" hidden>
                         </div>
@@ -727,14 +634,17 @@
                             <div class="progress-fill indeterminate"></div>
                         </div>
                         <button id="crop-download-btn" class="btn btn-accent" hidden>Download Cropped PNG</button>
-                        <button id="crop-save-library-btn" class="btn btn-primary" hidden>Save to Sprite Library</button>
+                        <button id="crop-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
                     </div>
                 </div>
             </div>
 
             <!-- Tool: AI Generate -->
             <div class="tool-panel" id="tool-ai-generate">
-                <h2>AI Sprite Generator</h2>
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">AI Sprite Generator</span>
+                </div>
                 <div class="ai-layout">
                     <div class="ai-preview">
                         <div class="ai-canvas-wrap" id="ai-generate-canvas-wrap" hidden>
@@ -810,7 +720,7 @@
                         </div>
                         <div id="ai-generate-actions" hidden>
                             <hr>
-                            <button id="ai-generate-save-btn" class="btn btn-accent" style="width:100%">Save to Sprite Library</button>
+                            <button id="ai-generate-save-btn" class="btn btn-accent" style="width:100%">Save to Library</button>
                             <button id="ai-generate-download-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Download PNG</button>
                         </div>
                         <div id="ai-generate-error" class="ai-error-msg" hidden></div>
@@ -820,7 +730,10 @@
 
             <!-- Tool: AI Animate -->
             <div class="tool-panel" id="tool-ai-animate">
-                <h2>AI Sprite Animator</h2>
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">AI Sprite Animator</span>
+                </div>
                 <div class="ai-layout">
                     <div class="ai-preview">
                         <div id="ai-animate-dropzone" class="dropzone" style="pointer-events:none;">
@@ -829,7 +742,7 @@
                                     <polygon points="5 3 19 12 5 21 5 3"/>
                                 </svg>
                                 <p>Select a sprite to animate</p>
-                                <span class="hint">Choose from your Sprite Library below</span>
+                                <span class="hint">Choose from your Library below</span>
                             </div>
                         </div>
                         <div id="ai-animate-source-wrap" hidden>
@@ -849,7 +762,7 @@
                     <div class="ai-settings">
                         <div class="setting-group">
                             <label>Source Sprite</label>
-                            <button id="ai-animate-select-btn" class="btn btn-secondary" style="width:100%">Select from Sprite Library</button>
+                            <button id="ai-animate-select-btn" class="btn btn-secondary" style="width:100%">Select from Library</button>
                         </div>
                         <div class="setting-group">
                             <label>Model</label>
@@ -907,7 +820,7 @@
                                 <label>Video Name</label>
                                 <input type="text" id="ai-animate-video-name" class="styled-input" placeholder="AI Animation" value="AI Animation">
                             </div>
-                            <button id="ai-animate-save-btn" class="btn btn-accent" style="width:100%">Save Video to Sprite Library</button>
+                            <button id="ai-animate-save-btn" class="btn btn-accent" style="width:100%">Save Video to Library</button>
                             <button id="ai-animate-download-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Download Video</button>
                         </div>
                         <div id="ai-animate-error" class="ai-error-msg" hidden></div>
@@ -915,6 +828,73 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- Create Asset Modal -->
+    <!-- Project Settings Modal -->
+    <div id="project-settings-modal" class="modal-overlay" hidden>
+        <div class="modal-dialog modal-dialog-sm">
+            <div class="modal-header">
+                <h3>Project Settings</h3>
+                <button id="project-settings-close" class="btn btn-secondary btn-small">X</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>Project Name</label>
+                    <input type="text" id="project-settings-name" class="styled-select" placeholder="My Project">
+                </div>
+                <div class="setting-group">
+                    <label>Art Style <span class="hint">(use <code>{{art_style}}</code> in prompts to inject this)</span></label>
+                    <textarea id="project-settings-art-style" class="styled-select" rows="3" placeholder="e.g. VGA pixel art, 320x200, 256 color palette, Sierra adventure game style"></textarea>
+                </div>
+                <div class="setting-group">
+                    <label>Default Resolution</label>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="number" id="project-settings-res-w" class="styled-select" style="width:80px;" min="1" placeholder="64">
+                        <span>&times;</span>
+                        <input type="number" id="project-settings-res-h" class="styled-select" style="width:80px;" min="1" placeholder="64">
+                        <span class="hint">px</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span id="project-settings-status" class="hint"></span>
+                <button id="project-settings-save" class="btn btn-primary btn-small">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-asset-modal" class="modal-overlay" hidden>
+        <div class="modal-dialog modal-dialog-sm">
+            <div class="modal-header">
+                <h3>New Asset</h3>
+                <button id="create-asset-close" class="btn btn-secondary btn-small">X</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>Name</label>
+                    <input type="text" id="create-asset-name" class="styled-select" placeholder="e.g. Knight, Forest Background...">
+                </div>
+                <div class="setting-group">
+                    <label>Category</label>
+                    <select id="create-asset-category" class="styled-select">
+                        <option value="characters">Characters</option>
+                        <option value="backgrounds">Backgrounds</option>
+                        <option value="objects">Objects</option>
+                        <option value="ui">UI</option>
+                        <option value="sounds">Sounds</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Tags <span class="hint">(comma-separated, optional)</span></label>
+                    <input type="text" id="create-asset-tags" class="styled-select" placeholder="e.g. medieval, warrior, idle">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span id="create-asset-status" class="hint"></span>
+                <button id="create-asset-confirm" class="btn btn-primary btn-small">Create</button>
+            </div>
         </div>
     </div>
 
@@ -941,22 +921,22 @@
     <div id="save-library-modal" class="modal-overlay" hidden>
         <div class="modal-dialog modal-dialog-sm">
             <div class="modal-header">
-                <h3>Save to Sprite Library</h3>
+                <h3>Save to Library</h3>
                 <button id="save-library-modal-close" class="btn btn-secondary btn-small">X</button>
             </div>
             <div class="modal-body">
                 <div class="setting-group">
-                    <label>Sprite</label>
+                    <label>Asset</label>
                     <div class="save-library-sprite-options">
-                        <label class="loop-label"><input type="radio" name="save-lib-sprite-mode" value="existing" checked> Existing sprite</label>
-                        <label class="loop-label"><input type="radio" name="save-lib-sprite-mode" value="new"> New sprite</label>
+                        <label class="loop-label"><input type="radio" name="save-lib-sprite-mode" value="existing" checked> Existing asset</label>
+                        <label class="loop-label"><input type="radio" name="save-lib-sprite-mode" value="new"> New asset</label>
                     </div>
                     <select id="save-library-sprite-select" class="styled-select" style="margin-top:8px;"></select>
-                    <input type="text" id="save-library-new-sprite-name" class="styled-select" placeholder="New sprite name..." style="margin-top:8px;" hidden>
+                    <input type="text" id="save-library-new-sprite-name" class="styled-select" placeholder="New asset name..." style="margin-top:8px;" hidden>
                 </div>
                 <div class="setting-group">
-                    <label>Loop Name</label>
-                    <input type="text" id="save-library-loop-name" class="styled-select" placeholder="e.g. Walk Right" value="Untitled Loop">
+                    <label>View Name</label>
+                    <input type="text" id="save-library-loop-name" class="styled-select" placeholder="e.g. Walk Right" value="Untitled View">
                 </div>
             </div>
             <div class="modal-footer">
@@ -974,9 +954,11 @@
     <script src="/static/js/resize.js"></script>
     <script src="/static/js/image-transparency.js"></script>
     <script src="/static/js/library-modal.js"></script>
-    <script src="/static/js/sprite-library.js"></script>
+    <script src="/static/js/project-home.js"></script>
+    <script src="/static/js/asset-detail.js"></script>
     <script src="/static/js/crop.js"></script>
     <script src="/static/js/ai-generate.js"></script>
     <script src="/static/js/ai-animate.js"></script>
+    <script src="/static/js/project-settings.js"></script>
 </body>
 </html>

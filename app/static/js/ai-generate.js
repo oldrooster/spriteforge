@@ -86,7 +86,7 @@
             onSelect: async function (result) {
                 var loop = result.items[0];
                 var sprite = result.sprite;
-                var imgUrl = '/api/library/' + sprite.id + '/loops/' + loop.id + '/frames/frame_0001.png';
+                var imgUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/frame_0001.png';
                 try {
                     var resp = await fetch(imgUrl);
                     referenceBlob = await resp.blob();
@@ -269,6 +269,7 @@
                 formData.append('prompt', prompt);
                 formData.append('model', modelSelect.value);
                 formData.append('reference_image', referenceBlob, 'reference.png');
+                if (state.currentAssetId) formData.append('asset_id', state.currentAssetId);
                 resp = await fetch('/api/ai-generate', {
                     method: 'POST',
                     body: formData,
@@ -280,6 +281,7 @@
                     body: JSON.stringify({
                         prompt: prompt,
                         model: modelSelect.value,
+                        asset_id: state.currentAssetId || '',
                     }),
                 });
             }
@@ -322,6 +324,7 @@
                     prompt: prompt,
                     model: modelSelect.value,
                     reference_image: lastImage,
+                    asset_id: state.currentAssetId || '',
                 }),
             });
             var data = await resp.json();
@@ -374,18 +377,18 @@
         if (typeof window.openSaveModal !== 'function') return;
 
         window.openSaveModal({
-            defaultLoopName: 'AI Generated',
-            onSave: async function (spriteId, loopName) {
+            defaultViewName: 'AI Generated',
+            onSave: async function (assetId, viewName) {
                 // Fetch the current image as a blob
                 var imgResp = await fetch(currentImageUrl);
                 var blob = await imgResp.blob();
 
                 var formData = new FormData();
-                formData.append('name', loopName);
+                formData.append('name', viewName);
                 formData.append('delay', 100);
                 formData.append('frames', blob, 'frame_0001.png');
 
-                var resp = await fetch('/api/library/' + spriteId + '/loops', {
+                var resp = await fetch('/api/assets/' + assetId + '/views', {
                     method: 'POST',
                     body: formData,
                 });

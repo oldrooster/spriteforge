@@ -6,47 +6,93 @@ const state = {
     frames: [],
     transparentFrames: null,
     animationDelay: 100,
+    currentAssetId: null,
+    currentRoute: null,
 };
 
-// ── Top-level tool navigation ──
-let activeTool = 'video-to-frames';
+// ── Hash Router ──
+const routeHistory = [];
 
-function showTool(toolId) {
-    activeTool = toolId;
+function navigate(hash) {
+    routeHistory.push(window.location.hash);
+    window.location.hash = hash;
+}
 
-    document.querySelectorAll('.tool-panel').forEach(panel => {
-        panel.classList.toggle('active', panel.id === `tool-${toolId}`);
-    });
-
-    document.querySelectorAll('.sidebar-item').forEach(item => {
-        item.classList.toggle('active', item.dataset.tool === toolId);
-    });
-
-    // Re-trigger current step's active class so MutationObservers fire
-    if (toolId === 'video-to-frames') {
-        showStep(state.currentStep);
+function navigateBack() {
+    if (routeHistory.length > 0) {
+        window.location.hash = routeHistory.pop();
+    } else {
+        window.location.hash = '#/';
     }
 }
 
-document.querySelectorAll('.sidebar-item').forEach(item => {
-    item.addEventListener('click', () => {
-        showTool(item.dataset.tool);
-    });
-});
+function parseRoute(hash) {
+    const h = (hash || '#/').replace(/^#\/?/, '');
+    if (!h || h === '/') {
+        return { view: 'home' };
+    }
+    // #/asset/<id>/tool/<name>
+    const toolMatch = h.match(/^asset\/([^/]+)\/tool\/(.+)$/);
+    if (toolMatch) {
+        return { view: 'tool', assetId: toolMatch[1], tool: toolMatch[2] };
+    }
+    // #/asset/<id>
+    const assetMatch = h.match(/^asset\/([^/]+)$/);
+    if (assetMatch) {
+        return { view: 'asset', assetId: assetMatch[1] };
+    }
+    return { view: 'home' };
+}
 
-// Sidebar collapse
-const sidebar = document.getElementById('sidebar');
-const collapseBtn = document.getElementById('sidebar-collapse-btn');
+// Map tool route names to panel IDs
+const toolPanelMap = {
+    'video-to-frames': 'tool-video-to-frames',
+    'resize-images': 'tool-resize-images',
+    'crop-image': 'tool-crop-image',
+    'make-transparent': 'tool-make-transparent',
+    'ai-generate': 'tool-ai-generate',
+    'ai-animate': 'tool-ai-animate',
+};
 
-collapseBtn.addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
-});
+function applyRoute() {
+    const route = parseRoute(window.location.hash);
+    state.currentRoute = route;
 
-// Mobile sidebar toggle
-const sidebarToggle = document.getElementById('sidebar-toggle');
-sidebarToggle.addEventListener('click', () => {
-    sidebar.classList.toggle('mobile-open');
-});
+    // Hide all panels first
+    document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('project-home').classList.remove('active');
+    document.getElementById('asset-detail').classList.remove('active');
+
+    if (route.view === 'home') {
+        state.currentAssetId = null;
+        document.getElementById('project-home').classList.add('active');
+    } else if (route.view === 'asset') {
+        state.currentAssetId = route.assetId;
+        document.getElementById('asset-detail').classList.add('active');
+    } else if (route.view === 'tool') {
+        state.currentAssetId = route.assetId;
+        const panelId = toolPanelMap[route.tool];
+        if (panelId) {
+            const panel = document.getElementById(panelId);
+            if (panel) {
+                panel.classList.add('active');
+                // Re-trigger V2F wizard step so MutationObservers fire
+                if (route.tool === 'video-to-frames') {
+                    showStep(state.currentStep);
+                }
+            }
+        }
+    }
+}
+
+window.addEventListener('hashchange', applyRoute);
+
+// Set default hash if none
+if (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/') {
+    window.location.hash = '#/';
+}
+// Initial route on page load
+applyRoute();
 
 // ── Wizard step navigation (Video to Frames) ──
 const stepIds = ['step-upload', 'step-extract', 'step-preview', 'step-transparency'];

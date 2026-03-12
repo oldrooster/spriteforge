@@ -91,12 +91,12 @@
                     var loop = result.items[0];
                     var sprite = result.sprite;
                     var frameName = 'frame_0001.png';
-                    var imgUrl = '/api/library/' + sprite.id + '/loops/' + loop.id + '/frames/' + frameName;
+                    var imgUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/' + frameName;
                     try {
                         var resp = await fetch(imgUrl);
                         var blob = await resp.blob();
                         var file = new File([blob], frameName, { type: 'image/png' });
-                        librarySource = { sprite_id: sprite.id, loop_id: loop.id, filename: frameName };
+                        librarySource = { asset_id: sprite.id, view_id: loop.id, filename: frameName };
                         loadFile(file);
                     } catch (err) {
                         alert('Failed to load image from library: ' + err.message);
@@ -481,7 +481,7 @@
                 var blob = await imgResp.blob();
                 var formData = new FormData();
                 formData.append('image', blob, librarySource.filename);
-                var url = '/api/library/' + librarySource.sprite_id + '/loops/' + librarySource.loop_id + '/frames/' + librarySource.filename;
+                var url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
                 var resp = await fetch(url, { method: 'PUT', body: formData });
                 var data = await resp.json();
                 if (!resp.ok) throw new Error(data.error || 'Save failed');
