@@ -1,8 +1,8 @@
-# Sprite Forge - Architecture
+# Adventure Forge - Architecture
 
 ## Overview
 
-Sprite Forge is a single-page web application with multiple sprite-related tools accessible via a collapsible sidebar. It runs as a Dockerized Flask app with a vanilla JS frontend and uses FFmpeg for video processing, Pillow/NumPy/SciPy for image manipulation, rembg (u2net) for AI background removal, and Google GenAI (AI Studio or Vertex AI) for AI sprite generation and video animation.
+Adventure Forge is a single-page web application with multiple sprite-related tools accessible via a collapsible sidebar. It runs as a Dockerized Flask app with a vanilla JS frontend and uses FFmpeg for video processing, Pillow/NumPy/SciPy for image manipulation, rembg (u2net) for AI background removal, and Google GenAI (AI Studio or Vertex AI) for AI sprite generation and video animation.
 
 ## UI Layout
 

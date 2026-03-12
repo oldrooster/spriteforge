@@ -1,4 +1,4 @@
-# Sprite Forge
+# Adventure Forge
 
 An AI-powered sprite creation toolkit for game developers. Generate sprites with AI, animate them with video generation, extract frames from video, apply transparency, and export PNGs ready for your game engine.
 

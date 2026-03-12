@@ -1,4 +1,4 @@
-# Sprite Forge Redesign Spec: Point & Click Adventure Asset Manager
+# Adventure Forge Redesign Spec: Point & Click Adventure Asset Manager
 
 ## 1. INFORMATION ARCHITECTURE
 
@@ -6,7 +6,7 @@
 
 ```
 ┌─ HEADER ─────────────────────────────────────────────────────────────┐
-│  [☰] Sprite Forge    Project: "Space Quest Remake" [▼ switch]        │
+│  [☰] Adventure Forge    Project: "Space Quest Remake" [▼ switch]        │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌─ PROJECT HOME (default view) ──────────────────────────────────┐  │

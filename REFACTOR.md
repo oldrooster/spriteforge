@@ -1,4 +1,4 @@
-# Sprite Forge Refactor Plan
+# Adventure Forge Refactor Plan
 
 Breaks the REDESIGN.md spec into 8 phases. Each phase is a self-contained
 chunk that leaves the app in a working state. Phases can be done across
