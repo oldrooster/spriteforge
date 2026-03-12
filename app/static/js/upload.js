@@ -88,6 +88,20 @@
         }
     }
 
+    // Phase C: consume pending resource from context menu
+    const v2fToolPanel = document.getElementById('tool-video-to-frames');
+    if (v2fToolPanel) {
+        new MutationObserver(() => {
+            if (v2fToolPanel.classList.contains('active') && state.pendingToolResource) {
+                const pending = state.pendingToolResource;
+                state.pendingToolResource = null;
+                if (pending.type === 'video') {
+                    loadLibraryVideo(pending.resource_url, pending.filename);
+                }
+            }
+        }).observe(v2fToolPanel, { attributes: true, attributeFilter: ['class'] });
+    }
+
     // Expose for use from library-modal.js
     window.uploadFromLibrary = function (videoUrl, filename) {
         loadLibraryVideo(videoUrl, filename);

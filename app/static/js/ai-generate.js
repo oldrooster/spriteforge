@@ -33,11 +33,27 @@
     // Load models and prompts on first activation
     let modelsLoaded = false;
     const toolPanel = document.getElementById('tool-ai-generate');
-    const observer = new MutationObserver(() => {
-        if (toolPanel.classList.contains('active') && !modelsLoaded) {
-            loadModels();
-            loadPrompts();
-            modelsLoaded = true;
+    const observer = new MutationObserver(async () => {
+        if (toolPanel.classList.contains('active')) {
+            if (!modelsLoaded) {
+                loadModels();
+                loadPrompts();
+                modelsLoaded = true;
+            }
+            // Phase C: consume pending resource from context menu
+            if (state.pendingToolResource) {
+                const pending = state.pendingToolResource;
+                state.pendingToolResource = null;
+                try {
+                    const resp = await fetch(pending.resource_url);
+                    referenceBlob = await resp.blob();
+                    refImg.src = URL.createObjectURL(referenceBlob);
+                    refPreview.hidden = false;
+                    refClearBtn.hidden = false;
+                } catch (e) {
+                    showError('Failed to load reference image');
+                }
+            }
         }
     });
     observer.observe(toolPanel, { attributes: true, attributeFilter: ['class'] });

@@ -339,6 +339,26 @@
         }
     });
 
+    // Phase C: consume pending resource from context menu
+    const resizeToolPanel = document.getElementById('tool-resize-images');
+    if (resizeToolPanel) {
+        new MutationObserver(async () => {
+            if (resizeToolPanel.classList.contains('active') && state.pendingToolResource) {
+                const pending = state.pendingToolResource;
+                state.pendingToolResource = null;
+                try {
+                    const resp = await fetch(pending.resource_url);
+                    const blob = await resp.blob();
+                    const file = new File([blob], pending.filename, { type: blob.type || 'image/png' });
+                    librarySource = null;
+                    handleFiles([file]);
+                } catch (err) {
+                    alert('Failed to load resource: ' + err.message);
+                }
+            }
+        }).observe(resizeToolPanel, { attributes: true, attributeFilter: ['class'] });
+    }
+
     // Import from Sprite Library
     const resizeFromLibraryBtn = document.getElementById('resize-from-library-btn');
     if (resizeFromLibraryBtn) {

@@ -24,10 +24,31 @@
     // Load models on first activation
     let modelsLoaded = false;
     const toolPanel = document.getElementById('tool-ai-animate');
-    const observer = new MutationObserver(function () {
-        if (toolPanel.classList.contains('active') && !modelsLoaded) {
-            loadModels();
-            modelsLoaded = true;
+    const observer = new MutationObserver(async function () {
+        if (toolPanel.classList.contains('active')) {
+            if (!modelsLoaded) {
+                loadModels();
+                modelsLoaded = true;
+            }
+            // Phase C: consume pending resource from context menu
+            if (state.pendingToolResource) {
+                var pending = state.pendingToolResource;
+                state.pendingToolResource = null;
+                selectedSprite = {
+                    asset_id: pending.asset_id,
+                    asset_name: pending.filename,
+                    view_id: null,
+                    view_name: pending.filename,
+                    frame_index: 1,
+                    frame_count: 1,
+                };
+                sourceImg.src = pending.resource_url;
+                sourceWrap.hidden = false;
+                dropzone.hidden = true;
+                sourceInfo.textContent = pending.filename;
+                animateBtn.disabled = false;
+                framePicker.innerHTML = '';
+            }
         }
     });
     observer.observe(toolPanel, { attributes: true, attributeFilter: ['class'] });

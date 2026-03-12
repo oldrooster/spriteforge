@@ -570,6 +570,26 @@
         }
     });
 
+    // Phase C: consume pending resource from context menu
+    const transToolPanel = document.getElementById('tool-make-transparent');
+    if (transToolPanel) {
+        new MutationObserver(async () => {
+            if (transToolPanel.classList.contains('active') && state.pendingToolResource) {
+                const pending = state.pendingToolResource;
+                state.pendingToolResource = null;
+                try {
+                    const resp = await fetch(pending.resource_url);
+                    const blob = await resp.blob();
+                    const file = new File([blob], pending.filename, { type: blob.type || 'image/png' });
+                    librarySource = null;
+                    uploadImage(file);
+                } catch (err) {
+                    alert('Failed to load resource: ' + err.message);
+                }
+            }
+        }).observe(transToolPanel, { attributes: true, attributeFilter: ['class'] });
+    }
+
     // ── Save back to Sprite Library ──
     const saveToLibraryBtn = document.getElementById('img-trans-save-library-btn');
     if (saveToLibraryBtn) {

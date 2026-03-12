@@ -471,6 +471,26 @@
         }
     });
 
+    // Phase C: consume pending resource from context menu
+    const cropToolPanel = document.getElementById('tool-crop-image');
+    if (cropToolPanel) {
+        new MutationObserver(async function () {
+            if (cropToolPanel.classList.contains('active') && state.pendingToolResource) {
+                var pending = state.pendingToolResource;
+                state.pendingToolResource = null;
+                try {
+                    var resp = await fetch(pending.resource_url);
+                    var blob = await resp.blob();
+                    var file = new File([blob], pending.filename, { type: blob.type || 'image/png' });
+                    librarySource = null;
+                    loadFile(file);
+                } catch (err) {
+                    alert('Failed to load resource: ' + err.message);
+                }
+            }
+        }).observe(cropToolPanel, { attributes: true, attributeFilter: ['class'] });
+    }
+
     // ── Save to library ──
     if (saveLibraryBtn) {
         saveLibraryBtn.addEventListener('click', async function () {

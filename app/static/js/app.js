@@ -52,6 +52,7 @@ const toolPanelMap = {
     'make-transparent': 'tool-make-transparent',
     'ai-generate': 'tool-ai-generate',
     'ai-animate': 'tool-ai-animate',
+    'markup': 'tool-markup',
 };
 
 function applyRoute() {

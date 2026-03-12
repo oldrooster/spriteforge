@@ -828,6 +828,76 @@
                 </div>
             </div>
 
+            <!-- Mark Up Tool -->
+            <div class="tool-panel" id="tool-markup">
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">Mark Up</span>
+                </div>
+                <div class="markup-layout">
+                    <div class="markup-canvas-area">
+                        <div id="markup-empty" class="dropzone" style="pointer-events:none;">
+                            <div class="dropzone-content">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M12 20h9"/>
+                                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                                </svg>
+                                <p>No image loaded</p>
+                                <span class="hint">Open this tool from a resource's context menu</span>
+                            </div>
+                        </div>
+                        <div id="markup-canvas-wrap" hidden>
+                            <canvas id="markup-canvas"></canvas>
+                        </div>
+                    </div>
+                    <div class="markup-settings">
+                        <div class="setting-group">
+                            <label>Tool</label>
+                            <div class="markup-tool-btns">
+                                <button id="markup-brush-btn" class="btn btn-secondary btn-small active">Brush</button>
+                                <button id="markup-text-btn" class="btn btn-secondary btn-small">Text</button>
+                            </div>
+                        </div>
+                        <div id="markup-brush-settings">
+                            <div class="setting-group">
+                                <label>Color</label>
+                                <input type="color" id="markup-color" value="#ff0000">
+                            </div>
+                            <div class="setting-group">
+                                <label>Brush Size: <span id="markup-size-display">4</span>px</label>
+                                <input type="range" id="markup-size-slider" min="1" max="20" value="4" class="styled-range">
+                            </div>
+                        </div>
+                        <div id="markup-text-settings" hidden>
+                            <div class="setting-group">
+                                <label>Color</label>
+                                <input type="color" id="markup-text-color" value="#ff0000">
+                            </div>
+                            <div class="setting-group">
+                                <label>Font Size: <span id="markup-font-size-display">16</span>px</label>
+                                <input type="range" id="markup-font-size-slider" min="8" max="48" value="16" class="styled-range">
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="setting-group">
+                            <label>History</label>
+                            <div class="markup-tool-btns">
+                                <button id="markup-undo-btn" class="btn btn-secondary btn-small" disabled>Undo</button>
+                                <button id="markup-redo-btn" class="btn btn-secondary btn-small" disabled>Redo</button>
+                            </div>
+                            <button id="markup-clear-btn" class="btn btn-secondary btn-small" style="width:100%; margin-top:6px;">Clear All</button>
+                        </div>
+                        <hr>
+                        <div class="setting-group">
+                            <label>Save</label>
+                            <button id="markup-save-new-btn" class="btn btn-primary btn-small" style="width:100%">Save as New Resource</button>
+                            <button id="markup-overwrite-btn" class="btn btn-accent btn-small" style="width:100%; margin-top:6px;">Overwrite Original</button>
+                            <button id="markup-download-btn" class="btn btn-secondary btn-small" style="width:100%; margin-top:6px;">Download PNG</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -960,5 +1030,6 @@
     <script src="/static/js/ai-generate.js"></script>
     <script src="/static/js/ai-animate.js"></script>
     <script src="/static/js/project-settings.js"></script>
+    <script src="/static/js/markup.js"></script>
 </body>
 </html>
