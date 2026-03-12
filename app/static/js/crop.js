@@ -8,30 +8,36 @@
     var imageInfo = document.getElementById('crop-image-info');
     var settings = document.getElementById('crop-settings');
     var fromLibraryBtn = document.getElementById('crop-from-library-btn');
-    var cropBtn = document.getElementById('crop-btn');
     var cropProgress = document.getElementById('crop-progress');
     var downloadBtn = document.getElementById('crop-download-btn');
     var saveLibraryBtn = document.getElementById('crop-save-library-btn');
     var previewSection = document.getElementById('crop-preview-section');
     var previewCanvas = document.getElementById('crop-preview-canvas');
     var previewInfo = document.getElementById('crop-preview-info');
-    var selectAllBtn = document.getElementById('crop-select-all-btn');
 
     var xInput = document.getElementById('crop-x-input');
     var yInput = document.getElementById('crop-y-input');
     var wInput = document.getElementById('crop-w-input');
     var hInput = document.getElementById('crop-h-input');
 
+    // Zoom controls
+    var zoomInBtn = document.getElementById('crop-zoom-in');
+    var zoomOutBtn = document.getElementById('crop-zoom-out');
+    var zoomFitBtn = document.getElementById('crop-zoom-fit');
+    var zoomLevelEl = document.getElementById('crop-zoom-level');
+
     var sourceImage = null;
     var sourceFile = null;
     var librarySource = null;
-    var cropSessionId = null;
 
     // Crop region in image pixel coordinates
     var cropX = 0, cropY = 0, cropW = 100, cropH = 100;
 
     // Aspect ratio: null = free, otherwise w/h ratio number
     var aspectRatio = null;
+
+    // Zoom state: null = fit-to-container, otherwise a scale factor
+    var zoomLevel = null;
 
     // Interaction state
     var interaction = null; // null | 'draw' | 'move' | 'nw' | 'ne' | 'sw' | 'se'
@@ -45,14 +51,12 @@
             sourceImage = null;
             sourceFile = null;
             librarySource = null;
-            cropSessionId = null;
             interaction = null;
+            zoomLevel = null;
             dropzone.style.display = '';
             canvasArea.hidden = true;
             settings.style.display = 'none';
             previewSection.hidden = true;
-            downloadBtn.hidden = true;
-            saveLibraryBtn.hidden = true;
             fileInput.value = '';
         });
     }
@@ -129,17 +133,74 @@
             canvasArea.hidden = false;
             settings.style.display = '';
             previewSection.hidden = false;
-            downloadBtn.hidden = true;
-            saveLibraryBtn.hidden = true;
-            cropSessionId = null;
-            cropBtn.disabled = false;
+            saveLibraryBtn.hidden = !librarySource;
 
+            zoomLevel = null;
+            applyZoom();
             drawCanvas();
             updateInputs();
             updatePreview();
         };
         img.src = URL.createObjectURL(file);
     }
+
+    // ── Zoom ──
+    function applyZoom() {
+        if (!sourceImage) return;
+        if (zoomLevel === null) {
+            // Fit mode
+            canvasWrap.classList.add('fit');
+            canvasWrap.classList.remove('zoomed');
+            canvas.style.width = '';
+            canvas.style.height = '';
+            zoomLevelEl.textContent = 'Fit';
+        } else {
+            canvasWrap.classList.remove('fit');
+            canvasWrap.classList.add('zoomed');
+            canvas.style.width = Math.round(sourceImage.width * zoomLevel) + 'px';
+            canvas.style.height = Math.round(sourceImage.height * zoomLevel) + 'px';
+            zoomLevelEl.textContent = Math.round(zoomLevel * 100) + '%';
+        }
+    }
+
+    function getCurrentScale() {
+        if (!sourceImage) return 1;
+        if (zoomLevel !== null) return zoomLevel;
+        // Fit mode: compute from rendered size
+        var rect = canvas.getBoundingClientRect();
+        return rect.width / sourceImage.width;
+    }
+
+    function setZoom(level) {
+        zoomLevel = Math.max(0.1, Math.min(10, level));
+        applyZoom();
+        drawCanvas();
+    }
+
+    zoomInBtn.addEventListener('click', function () {
+        var current = getCurrentScale();
+        setZoom(current * 1.25);
+    });
+
+    zoomOutBtn.addEventListener('click', function () {
+        var current = getCurrentScale();
+        setZoom(current / 1.25);
+    });
+
+    zoomFitBtn.addEventListener('click', function () {
+        zoomLevel = null;
+        applyZoom();
+        drawCanvas();
+    });
+
+    // Mouse wheel zoom
+    canvasWrap.addEventListener('wheel', function (e) {
+        if (!sourceImage) return;
+        e.preventDefault();
+        var current = getCurrentScale();
+        var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        setZoom(current * factor);
+    }, { passive: false });
 
     // ── Drawing: render image + dim outside crop region ──
     function drawCanvas() {
@@ -411,6 +472,14 @@
             var ratio = btn.dataset.ratio;
             if (ratio === 'free') {
                 aspectRatio = null;
+            } else if (ratio === 'all') {
+                // Select entire image
+                aspectRatio = null;
+                if (sourceImage) {
+                    cropX = 0; cropY = 0;
+                    cropW = sourceImage.width; cropH = sourceImage.height;
+                    drawCanvas(); updateInputs(); updatePreview();
+                }
             } else {
                 var parts = ratio.split(':');
                 aspectRatio = parseInt(parts[0]) / parseInt(parts[1]);
@@ -420,26 +489,13 @@
         });
     });
 
-    // ── Select entire image ──
-    selectAllBtn.addEventListener('click', function () {
-        if (!sourceImage) return;
-        cropX = 0; cropY = 0;
-        cropW = sourceImage.width; cropH = sourceImage.height;
-        if (aspectRatio) {
-            cropH = Math.round(cropW / aspectRatio);
-            clampCrop();
-        }
-        drawCanvas(); updateInputs(); updatePreview();
-    });
+    // ── Crop + Download ──
+    async function doCrop() {
+        if (!sourceFile || !sourceImage) return null;
 
-    // ── Crop action ──
-    cropBtn.addEventListener('click', async function () {
-        if (!sourceFile || !sourceImage) return;
-
-        cropBtn.disabled = true;
         cropProgress.hidden = false;
-        downloadBtn.hidden = true;
-        saveLibraryBtn.hidden = true;
+        downloadBtn.disabled = true;
+        saveLibraryBtn.disabled = true;
 
         try {
             var formData = new FormData();
@@ -453,21 +509,45 @@
             var data = await resp.json();
             if (!resp.ok) throw new Error(data.error);
 
-            cropSessionId = data.session_id;
-            downloadBtn.hidden = false;
-            if (librarySource) saveLibraryBtn.hidden = false;
+            return data.session_id;
         } catch (err) {
             alert('Crop failed: ' + err.message);
+            return null;
         } finally {
-            cropBtn.disabled = false;
             cropProgress.hidden = true;
+            downloadBtn.disabled = false;
+            saveLibraryBtn.disabled = false;
+        }
+    }
+
+    downloadBtn.addEventListener('click', async function () {
+        var sessionId = await doCrop();
+        if (sessionId) {
+            window.location.href = '/api/download-crop/' + sessionId;
         }
     });
 
-    // ── Download ──
-    downloadBtn.addEventListener('click', function () {
-        if (cropSessionId) {
-            window.location.href = '/api/download-crop/' + cropSessionId;
+    // ── Save to library ──
+    saveLibraryBtn.addEventListener('click', async function () {
+        if (!librarySource) return;
+        var sessionId = await doCrop();
+        if (!sessionId) return;
+
+        saveLibraryBtn.disabled = true;
+        try {
+            var imgResp = await fetch('/api/crop-preview/' + sessionId);
+            var blob = await imgResp.blob();
+            var formData = new FormData();
+            formData.append('image', blob, librarySource.filename);
+            var url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
+            var resp = await fetch(url, { method: 'PUT', body: formData });
+            var data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'Save failed');
+            alert('Saved to sprite library!');
+        } catch (err) {
+            alert('Failed to save: ' + err.message);
+        } finally {
+            saveLibraryBtn.disabled = false;
         }
     });
 
@@ -489,28 +569,5 @@
                 }
             }
         }).observe(cropToolPanel, { attributes: true, attributeFilter: ['class'] });
-    }
-
-    // ── Save to library ──
-    if (saveLibraryBtn) {
-        saveLibraryBtn.addEventListener('click', async function () {
-            if (!librarySource || !cropSessionId) return;
-            saveLibraryBtn.disabled = true;
-            try {
-                var imgResp = await fetch('/api/crop-preview/' + cropSessionId);
-                var blob = await imgResp.blob();
-                var formData = new FormData();
-                formData.append('image', blob, librarySource.filename);
-                var url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
-                var resp = await fetch(url, { method: 'PUT', body: formData });
-                var data = await resp.json();
-                if (!resp.ok) throw new Error(data.error || 'Save failed');
-                alert('Saved to sprite library!');
-            } catch (err) {
-                alert('Failed to save: ' + err.message);
-            } finally {
-                saveLibraryBtn.disabled = false;
-            }
-        });
     }
 })();

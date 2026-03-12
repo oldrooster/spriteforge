@@ -14,7 +14,6 @@
     const interpolation = document.getElementById('resize-interpolation');
     const flipHCheckbox = document.getElementById('resize-flip-h');
     const flipVCheckbox = document.getElementById('resize-flip-v');
-    const resizeBtn = document.getElementById('resize-btn');
     const resizeProgress = document.getElementById('resize-progress');
     const downloadBtn = document.getElementById('resize-download-btn');
     const resizeSaveLibraryBtn = document.getElementById('resize-save-library-btn');
@@ -27,10 +26,9 @@
     let files = [];
     let aspectLocked = true;
     let originalDimensions = null;
-    let resizeSessionId = null;
     let selectedIndex = 0;
-    let selectedImage = null; // HTMLImageElement of the currently selected file
-    let librarySource = null; // { sprite_id, loop_id, filenames: ['frame_0001.png', ...] } when loaded from library
+    let selectedImage = null;
+    let librarySource = null;
 
     // Mode toggle
     document.querySelectorAll('input[name="resize-mode"]').forEach(radio => {
@@ -48,7 +46,6 @@
         radio.addEventListener('change', updatePreview);
     });
 
-    // Show/hide fit group based on whether aspect ratio is changing
     function updateFitVisibility() {
         const mode = document.querySelector('input[name="resize-mode"]:checked').value;
         if (mode === 'percentage' || aspectLocked) {
@@ -63,7 +60,11 @@
     }
 
     // Drag-and-drop
-    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('click', (e) => {
+        const libBtn = document.getElementById('resize-from-library-btn');
+        if (libBtn && (e.target === libBtn || libBtn.contains(e.target))) return;
+        fileInput.click();
+    });
 
     dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -94,16 +95,12 @@
         files = Array.from(newFiles).filter(f => f.type.startsWith('image/'));
         if (files.length === 0) return;
 
-        // Reset download state
-        downloadBtn.hidden = true;
-        if (resizeSaveLibraryBtn) resizeSaveLibraryBtn.hidden = true;
-        resizeSessionId = null;
         selectedIndex = 0;
 
-        // Read first image for dimensions
-        loadSelectedImage(0);
+        // Hide dropzone, show thumbnails + preview
+        dropzone.style.display = 'none';
 
-        // Show thumbnails
+        // Show thumbnails along the top
         fileListEl.hidden = false;
         fileListEl.innerHTML = '';
         files.forEach((f, i) => {
@@ -118,6 +115,9 @@
             div.appendChild(name);
             fileListEl.appendChild(div);
         });
+
+        // Read first image for dimensions
+        loadSelectedImage(0);
     }
 
     function selectFile(index) {
@@ -136,7 +136,6 @@
             widthInput.value = img.naturalWidth;
             heightInput.value = img.naturalHeight;
             originalInfo.textContent = `${img.naturalWidth} x ${img.naturalHeight}px (${files.length} file${files.length > 1 ? 's' : ''})`;
-            resizeBtn.disabled = false;
             updateFitVisibility();
             updatePreview();
         };
@@ -178,7 +177,6 @@
         updatePreview();
     });
 
-    // Update preview whenever flip changes
     flipHCheckbox.addEventListener('change', updatePreview);
     flipVCheckbox.addEventListener('change', updatePreview);
     interpolation.addEventListener('change', updatePreview);
@@ -212,7 +210,6 @@
             targetH = parseInt(heightInput.value) || 1;
         }
 
-        // Determine fit mode
         const fitMode = document.querySelector('input[name="resize-fit"]:checked').value;
         const interpName = interpolation.value;
         const useSmoothing = interpName !== 'nearest';
@@ -224,7 +221,7 @@
         rCtx.imageSmoothingEnabled = useSmoothing;
         rCtx.imageSmoothingQuality = 'high';
 
-        // Draw checkerboard background for transparency
+        // Checkerboard background
         const chkSize = Math.max(4, Math.min(16, Math.floor(targetW / 16)));
         for (let y = 0; y < targetH; y += chkSize) {
             for (let x = 0; x < targetW; x += chkSize) {
@@ -234,10 +231,8 @@
         }
 
         if (fitMode === 'stretch' || aspectLocked || mode === 'percentage') {
-            // Direct resize (stretch)
             drawWithFlip(rCtx, selectedImage, 0, 0, targetW, targetH);
         } else if (fitMode === 'fit') {
-            // Scale to fit: entire image visible, letterboxed
             const scaleX = targetW / srcW;
             const scaleY = targetH / srcH;
             const s = Math.min(scaleX, scaleY);
@@ -247,7 +242,6 @@
             const offY = Math.round((targetH - fitH) / 2);
             drawWithFlip(rCtx, selectedImage, offX, offY, fitW, fitH);
         } else if (fitMode === 'crop') {
-            // Crop to fill: image fills target, excess cropped
             const scaleX = targetW / srcW;
             const scaleY = targetH / srcH;
             const s = Math.max(scaleX, scaleY);
@@ -289,9 +283,9 @@
         ctx.restore();
     }
 
-    // Resize
-    resizeBtn.addEventListener('click', async () => {
-        if (files.length === 0) return;
+    // ── Resize + Download (combined) ──
+    async function doResize() {
+        if (files.length === 0) return null;
 
         const formData = new FormData();
         files.forEach(f => formData.append('images', f));
@@ -310,9 +304,9 @@
         formData.append('flip_h', flipHCheckbox.checked);
         formData.append('flip_v', flipVCheckbox.checked);
 
-        resizeBtn.disabled = true;
         resizeProgress.hidden = false;
-        downloadBtn.hidden = true;
+        downloadBtn.disabled = true;
+        resizeSaveLibraryBtn.disabled = true;
 
         try {
             const resp = await fetch('/api/resize', {
@@ -322,22 +316,86 @@
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error);
 
-            resizeSessionId = data.session_id;
-            downloadBtn.hidden = false;
-            if (resizeSaveLibraryBtn && librarySource) resizeSaveLibraryBtn.hidden = false;
+            return { sessionId: data.session_id, count: data.count };
         } catch (err) {
             alert('Resize failed: ' + err.message);
+            return null;
         } finally {
-            resizeBtn.disabled = false;
             resizeProgress.hidden = true;
+            downloadBtn.disabled = false;
+            resizeSaveLibraryBtn.disabled = false;
+        }
+    }
+
+    downloadBtn.addEventListener('click', async () => {
+        const result = await doResize();
+        if (!result) return;
+
+        if (result.count === 1) {
+            // Single image: download as PNG directly
+            window.location.href = `/api/download-resized/${result.sessionId}?format=single`;
+        } else {
+            // Multiple images: download as ZIP
+            window.location.href = `/api/download-resized/${result.sessionId}`;
         }
     });
 
-    downloadBtn.addEventListener('click', () => {
-        if (resizeSessionId) {
-            window.location.href = `/api/download-resized/${resizeSessionId}`;
+    // ── Save to library ──
+    resizeSaveLibraryBtn.addEventListener('click', async () => {
+        if (!librarySource) return;
+        const result = await doResize();
+        if (!result) return;
+
+        resizeSaveLibraryBtn.disabled = true;
+        try {
+            const resp = await fetch('/api/save-resized-to-library', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: result.sessionId,
+                    asset_id: librarySource.asset_id,
+                    frames: librarySource.frames,
+                }),
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'Save failed');
+            alert('Saved ' + data.count + ' frame(s) to sprite library!');
+        } catch (err) {
+            alert('Failed to save: ' + err.message);
+        } finally {
+            resizeSaveLibraryBtn.disabled = false;
         }
     });
+
+    // ── Back to upload (choose different images) ──
+    // Reuse the panel back bar for navigation; add a "change images" button via fileListEl
+    function showBackToUpload() {
+        const existing = fileListEl.querySelector('.resize-change-btn');
+        if (existing) return;
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-secondary btn-small resize-change-btn';
+        btn.textContent = '+ Add / Change';
+        btn.addEventListener('click', () => {
+            fileInput.value = '';
+            fileInput.click();
+        });
+        fileListEl.appendChild(btn);
+    }
+
+    // Show the change button whenever files are loaded
+    const origHandleFiles = handleFiles;
+    const _origHandleFiles = handleFiles;
+
+    // We need to call showBackToUpload after handleFiles sets up the thumbnails
+    const origLoadSelectedImage = loadSelectedImage;
+
+    // Patch: after thumbnails render, add the change button
+    const _fileListObserver = new MutationObserver(() => {
+        if (!fileListEl.hidden && files.length > 0) {
+            showBackToUpload();
+        }
+    });
+    _fileListObserver.observe(fileListEl, { childList: true });
 
     // Phase C: consume pending resource from context menu
     const resizeToolPanel = document.getElementById('tool-resize-images');
@@ -363,17 +421,15 @@
     const resizeFromLibraryBtn = document.getElementById('resize-from-library-btn');
     if (resizeFromLibraryBtn) {
         resizeFromLibraryBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Don't trigger dropzone click
+            e.stopPropagation();
             if (typeof window.openLibraryModal === 'function') {
                 window.openLibraryModal({
                     mode: 'loops',
                     title: 'Import Frames from Library',
                     multiSelect: true,
                     onSelect: async (result) => {
-                        // Fetch frames from selected loops as File objects
                         const newFiles = [];
                         const frameNames = [];
-                        const loop = result.items[0];
                         for (const loopItem of result.items) {
                             for (let i = 1; i <= loopItem.frame_count; i++) {
                                 const frameName = `frame_${String(i).padStart(4, '0')}.png`;
@@ -395,37 +451,10 @@
                                 frames: frameNames,
                             };
                             handleFiles(newFiles);
-                            if (resizeSaveLibraryBtn) resizeSaveLibraryBtn.hidden = false;
+                            resizeSaveLibraryBtn.hidden = false;
                         }
                     },
                 });
-            }
-        });
-    }
-
-    // Save resized images back to Sprite Library
-    if (resizeSaveLibraryBtn) {
-        resizeSaveLibraryBtn.addEventListener('click', async () => {
-            if (!librarySource || !resizeSessionId) return;
-            resizeSaveLibraryBtn.disabled = true;
-            try {
-                // Download the resized ZIP, extract and overwrite each frame
-                const resp = await fetch(`/api/save-resized-to-library`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: resizeSessionId,
-                        asset_id: librarySource.asset_id,
-                        frames: librarySource.frames,
-                    }),
-                });
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.error || 'Save failed');
-                alert('Saved ' + data.count + ' frame(s) to sprite library!');
-            } catch (err) {
-                alert('Failed to save: ' + err.message);
-            } finally {
-                resizeSaveLibraryBtn.disabled = false;
             }
         });
     }

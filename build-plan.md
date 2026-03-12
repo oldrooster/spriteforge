@@ -4,7 +4,7 @@ Phased implementation plan derived from [to-build.md](to-build.md).
 
 ---
 
-## Phase 0 — Bug Fixes
+## Phase 0 — Bug Fixes ✓
 *Fix known issues before adding features.*
 
 ### 0.1 Assets not showing on first load
@@ -15,7 +15,7 @@ Phased implementation plan derived from [to-build.md](to-build.md).
 
 ---
 
-## Phase 1 — Crop Tool Improvements
+## Phase 1 — Crop Tool Improvements ✓
 *Enhance the interactive crop experience with live-sync and streamlined UI.*
 
 ### 1.1 Two-way sync: cursor selection <-> input boxes
@@ -42,7 +42,7 @@ Phased implementation plan derived from [to-build.md](to-build.md).
 
 ---
 
-## Phase 2 — Resize Tool Improvements
+## Phase 2 — Resize Tool Improvements ✓
 *Streamline the resize workflow for single and batch images.*
 
 ### 2.1 Post-selection layout: remove upload box, show thumbnails + stacked preview
@@ -69,7 +69,7 @@ Phased implementation plan derived from [to-build.md](to-build.md).
 
 ---
 
-## Phase 3 — Make Transparent Tool Improvements
+## Phase 3 — Make Transparent Tool Improvements ✓
 *Small UX polish for the transparency tool.*
 
 ### 3.1 Lower minimum zoom
@@ -86,7 +86,7 @@ Phased implementation plan derived from [to-build.md](to-build.md).
 
 ---
 
-## Phase 4 — Standalone AI Generate
+## Phase 4 — Standalone AI Generate ✓
 *Promote AI image generation to a top-level tool accessible without an existing asset.*
 
 ### 4.1 Add "Generate" entry point
@@ -101,7 +101,7 @@ Phased implementation plan derived from [to-build.md](to-build.md).
 
 ---
 
-## Phase 5 — Prompt Library
+## Phase 5 — Prompt Library ✓
 *Centralized prompt management with integration into AI tools.*
 
 ### 5.1 Prompt management UI (Settings)

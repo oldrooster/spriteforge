@@ -45,8 +45,8 @@
 
     // Zoom
     let zoomLevel = 1;
-    const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
-    let zoomStepIndex = 2;
+    const ZOOM_STEPS = [0.1, 0.15, 0.2, 0.25, 0.33, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
+    let zoomStepIndex = 7;
 
     // Eraser cursor
     const eraserCursor = document.createElement('div');
@@ -135,7 +135,7 @@
     }
 
     function calcFitZoomIndex() {
-        if (!originalImage) return 2;
+        if (!originalImage) return 7;
         const containerW = zoomContainer.clientWidth || 600;
         const containerH = zoomContainer.clientHeight || 500;
         const fitScale = Math.min(containerW / originalImage.width, containerH / originalImage.height, 1);

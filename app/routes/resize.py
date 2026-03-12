@@ -3,7 +3,7 @@ import os
 import uuid
 import zipfile
 
-from flask import Blueprint, current_app, jsonify, request, send_file
+from flask import Blueprint, current_app, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
 resize_bp = Blueprint('resize', __name__)
@@ -140,6 +140,12 @@ def download_resized(session_id):
     if not files:
         return jsonify({'error': 'No files found'}), 404
 
+    # Single file: return PNG directly
+    fmt = request.args.get('format')
+    if fmt == 'single' and len(files) == 1:
+        return send_from_directory(output_dir, files[0], as_attachment=True, download_name=files[0])
+
+    # Multiple files: return ZIP
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for f in files:

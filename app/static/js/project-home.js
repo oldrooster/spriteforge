@@ -169,6 +169,14 @@
     modalName.addEventListener('keydown', (e) => { if (e.key === 'Enter') modalConfirm.click(); });
     modalTags.addEventListener('keydown', (e) => { if (e.key === 'Enter') modalConfirm.click(); });
 
+    // ── Generate button (standalone AI generate) ──
+    const headerGenerateBtn = document.getElementById('header-generate-btn');
+    if (headerGenerateBtn) {
+        headerGenerateBtn.addEventListener('click', () => {
+            navigate('#/tool/ai-generate');
+        });
+    }
+
     // ── Auto-load when panel becomes visible ──
 
     const observer = new MutationObserver(() => {
@@ -177,6 +185,11 @@
         }
     });
     observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
+
+    // If the panel is already active (e.g. initial page load), load immediately
+    if (panel.classList.contains('active')) {
+        loadAssets();
+    }
 
     // Expose for integration
     window.projectHome = { loadAssets };

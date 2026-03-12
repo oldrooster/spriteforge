@@ -17,17 +17,24 @@
     const downloadBtn = document.getElementById('ai-animate-download-btn');
     const errorEl = document.getElementById('ai-animate-error');
 
+    // Prompt dropdown elements
+    const promptSearch = document.getElementById('ai-animate-prompt-search');
+    const promptDropdown = document.getElementById('ai-animate-prompt-dropdown');
+    const savePromptBtn = document.getElementById('ai-animate-save-prompt-btn');
+
     let selectedSprite = null;
     let sessionId = null;
     let pollTimer = null;
+    let prompts = [];
 
-    // Load models on first activation
+    // Load models and prompts on first activation
     let modelsLoaded = false;
     const toolPanel = document.getElementById('tool-ai-animate');
     const observer = new MutationObserver(async function () {
         if (toolPanel.classList.contains('active')) {
             if (!modelsLoaded) {
                 loadModels();
+                loadPrompts();
                 modelsLoaded = true;
             }
             // Phase C: consume pending resource from context menu
@@ -69,6 +76,113 @@
             showError('Failed to load models');
         }
     }
+
+    // ── Prompt Library (filterable dropdown) ──
+    async function loadPrompts() {
+        try {
+            var resp = await fetch('/api/ai-generate/prompts');
+            var data = await resp.json();
+            // Filter to video/both prompts
+            prompts = data.prompts.filter(function (p) {
+                return p.gen_type === 'video' || p.gen_type === 'both';
+            });
+        } catch (e) {
+            console.error('Failed to load prompts:', e);
+        }
+    }
+
+    function renderDropdown(filter) {
+        promptDropdown.innerHTML = '';
+        var query = (filter || '').toLowerCase();
+        var filtered = prompts.filter(function (p) {
+            return p.name.toLowerCase().includes(query) || p.prompt.toLowerCase().includes(query);
+        });
+        if (filtered.length === 0) {
+            promptDropdown.innerHTML = '<div class="prompt-dropdown-empty">No matching prompts</div>';
+            promptDropdown.hidden = false;
+            return;
+        }
+        filtered.forEach(function (p) {
+            var item = document.createElement('div');
+            item.className = 'prompt-dropdown-item';
+
+            var nameEl = document.createElement('div');
+            nameEl.className = 'prompt-dropdown-item-name';
+            nameEl.textContent = p.name;
+
+            var textEl = document.createElement('div');
+            textEl.className = 'prompt-dropdown-item-text';
+            textEl.textContent = p.prompt;
+
+            item.appendChild(nameEl);
+            item.appendChild(textEl);
+
+            item.addEventListener('click', function () {
+                selectPrompt(p.prompt);
+                promptDropdown.hidden = true;
+                promptSearch.value = '';
+            });
+
+            promptDropdown.appendChild(item);
+        });
+        promptDropdown.hidden = false;
+    }
+
+    function selectPrompt(text) {
+        var current = promptInput.value.trim();
+        if (!current) {
+            promptInput.value = text;
+        } else {
+            if (confirm('Replace current prompt? (Cancel to append)')) {
+                promptInput.value = text;
+            } else {
+                promptInput.value = current + '\n' + text;
+            }
+        }
+        promptInput.focus();
+    }
+
+    promptSearch.addEventListener('focus', function () {
+        renderDropdown(promptSearch.value);
+    });
+
+    promptSearch.addEventListener('input', function () {
+        renderDropdown(promptSearch.value);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function (e) {
+        if (!promptSearch.contains(e.target) && !promptDropdown.contains(e.target)) {
+            promptDropdown.hidden = true;
+        }
+    });
+
+    // Save current prompt
+    savePromptBtn.addEventListener('click', async function () {
+        var text = promptInput.value.trim();
+        if (!text) { showError('Enter a prompt first'); return; }
+
+        var name = prompt('Prompt name:');
+        if (!name || !name.trim()) return;
+
+        savePromptBtn.disabled = true;
+        try {
+            var resp = await fetch('/api/ai-generate/prompts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim(), prompt: text, category: 'characters', gen_type: 'video' }),
+            });
+            if (!resp.ok) {
+                var err = await resp.json();
+                throw new Error(err.error || 'Save failed');
+            }
+            await loadPrompts();
+        } catch (e) {
+            showError(e.message);
+        } finally {
+            savePromptBtn.disabled = false;
+        }
+    });
 
     const framePicker = document.getElementById('ai-animate-frame-picker');
 
@@ -120,13 +234,6 @@
                     })(i);
                 }
             },
-        });
-    });
-
-    // Sample prompts
-    document.querySelectorAll('#ai-animate-samples .ai-animate-sample-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            promptInput.value = btn.dataset.prompt;
         });
     });
 

@@ -16,19 +16,15 @@
     const historyStrip = document.getElementById('ai-generate-history');
     const errorEl = document.getElementById('ai-generate-error');
 
-    const promptSamples = document.getElementById('ai-generate-samples');
-    const addPromptBtn = document.getElementById('ai-generate-add-prompt-btn');
-    const promptEditor = document.getElementById('ai-prompt-editor');
-    const promptEditorName = document.getElementById('ai-prompt-editor-name');
-    const promptEditorText = document.getElementById('ai-prompt-editor-text');
-    const promptEditorSave = document.getElementById('ai-prompt-editor-save');
-    const promptEditorCancel = document.getElementById('ai-prompt-editor-cancel');
+    // Prompt dropdown elements
+    const promptSearch = document.getElementById('ai-generate-prompt-search');
+    const promptDropdown = document.getElementById('ai-generate-prompt-dropdown');
+    const savePromptBtn = document.getElementById('ai-generate-save-prompt-btn');
 
     let sessionId = null;
     let currentImageUrl = null;
     let history = [];
     let prompts = [];
-    let editingPromptId = null; // null = adding new, string = editing existing
 
     // Load models and prompts on first activation
     let modelsLoaded = false;
@@ -82,7 +78,7 @@
     const refPreview = document.getElementById('ai-generate-ref-preview');
     const refImg = document.getElementById('ai-generate-ref-img');
 
-    let referenceBlob = null; // File or Blob of the reference image
+    let referenceBlob = null;
 
     refUpload.addEventListener('change', function () {
         if (refUpload.files.length > 0) {
@@ -125,7 +121,6 @@
 
     // Paste image from clipboard
     document.addEventListener('paste', function (e) {
-        // Only handle if the AI Generate panel is visible
         var panel = document.getElementById('tool-ai-generate');
         if (!panel || !panel.classList.contains('active')) return;
 
@@ -143,131 +138,112 @@
         }
     });
 
-    // ── Prompt Library ──
+    // ── Prompt Library (filterable dropdown) ──
     async function loadPrompts() {
         try {
             var resp = await fetch('/api/ai-generate/prompts');
             var data = await resp.json();
-            prompts = data.prompts;
-            renderPrompts();
+            // Filter to image/both prompts
+            prompts = data.prompts.filter(function (p) {
+                return !p.gen_type || p.gen_type === 'image' || p.gen_type === 'both';
+            });
         } catch (e) {
             console.error('Failed to load prompts:', e);
         }
     }
 
-    function renderPrompts() {
-        promptSamples.innerHTML = '';
-        prompts.forEach(function (p) {
+    function renderDropdown(filter) {
+        promptDropdown.innerHTML = '';
+        var query = (filter || '').toLowerCase();
+        var filtered = prompts.filter(function (p) {
+            return p.name.toLowerCase().includes(query) || p.prompt.toLowerCase().includes(query);
+        });
+        if (filtered.length === 0) {
+            promptDropdown.innerHTML = '<div class="prompt-dropdown-empty">No matching prompts</div>';
+            promptDropdown.hidden = false;
+            return;
+        }
+        filtered.forEach(function (p) {
             var item = document.createElement('div');
-            item.className = 'prompt-item';
-            item.title = p.prompt;
+            item.className = 'prompt-dropdown-item';
 
-            var name = document.createElement('span');
-            name.className = 'prompt-item-name';
-            name.textContent = p.name;
+            var nameEl = document.createElement('div');
+            nameEl.className = 'prompt-dropdown-item-name';
+            nameEl.textContent = p.name;
 
-            var actions = document.createElement('div');
-            actions.className = 'prompt-item-actions';
+            var textEl = document.createElement('div');
+            textEl.className = 'prompt-dropdown-item-text';
+            textEl.textContent = p.prompt;
 
-            var editBtn = document.createElement('button');
-            editBtn.textContent = 'Edit';
-            editBtn.title = 'Edit prompt';
-            editBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                openEditor(p.id, p.name, p.prompt);
-            });
-
-            var deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'Del';
-            deleteBtn.title = 'Delete prompt';
-            deleteBtn.className = 'prompt-delete-btn';
-            deleteBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                deletePrompt(p.id);
-            });
-
-            actions.appendChild(editBtn);
-            actions.appendChild(deleteBtn);
-
-            item.appendChild(name);
-            item.appendChild(actions);
+            item.appendChild(nameEl);
+            item.appendChild(textEl);
 
             item.addEventListener('click', function () {
-                promptInput.value = p.prompt;
+                selectPrompt(p.prompt);
+                promptDropdown.hidden = true;
+                promptSearch.value = '';
             });
 
-            promptSamples.appendChild(item);
+            promptDropdown.appendChild(item);
         });
+        promptDropdown.hidden = false;
     }
 
-    function openEditor(id, name, text) {
-        editingPromptId = id || null;
-        promptEditorName.value = name || '';
-        promptEditorText.value = text || '';
-        promptEditor.hidden = false;
-        promptEditorName.focus();
+    function selectPrompt(text) {
+        var current = promptInput.value.trim();
+        if (!current) {
+            promptInput.value = text;
+        } else {
+            if (confirm('Replace current prompt? (Cancel to append)')) {
+                promptInput.value = text;
+            } else {
+                promptInput.value = current + '\n' + text;
+            }
+        }
+        promptInput.focus();
     }
 
-    function closeEditor() {
-        editingPromptId = null;
-        promptEditorName.value = '';
-        promptEditorText.value = '';
-        promptEditor.hidden = true;
-    }
-
-    addPromptBtn.addEventListener('click', function () {
-        openEditor(null, '', '');
+    promptSearch.addEventListener('focus', function () {
+        renderDropdown(promptSearch.value);
     });
 
-    promptEditorCancel.addEventListener('click', closeEditor);
+    promptSearch.addEventListener('input', function () {
+        renderDropdown(promptSearch.value);
+    });
 
-    promptEditorSave.addEventListener('click', async function () {
-        var name = promptEditorName.value.trim();
-        var text = promptEditorText.value.trim();
-        if (!name || !text) return;
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function (e) {
+        if (!promptSearch.contains(e.target) && !promptDropdown.contains(e.target)) {
+            promptDropdown.hidden = true;
+        }
+    });
 
-        promptEditorSave.disabled = true;
+    // Save current prompt
+    savePromptBtn.addEventListener('click', async function () {
+        var text = promptInput.value.trim();
+        if (!text) { showError('Enter a prompt first'); return; }
+
+        var name = prompt('Prompt name:');
+        if (!name || !name.trim()) return;
+
+        savePromptBtn.disabled = true;
         try {
-            var resp;
-            if (editingPromptId) {
-                resp = await fetch('/api/ai-generate/prompts/' + editingPromptId, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, prompt: text }),
-                });
-            } else {
-                resp = await fetch('/api/ai-generate/prompts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, prompt: text }),
-                });
-            }
+            var resp = await fetch('/api/ai-generate/prompts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim(), prompt: text, category: 'characters', gen_type: 'image' }),
+            });
             if (!resp.ok) {
                 var err = await resp.json();
                 throw new Error(err.error || 'Save failed');
             }
-            closeEditor();
             await loadPrompts();
         } catch (e) {
             showError(e.message);
         } finally {
-            promptEditorSave.disabled = false;
+            savePromptBtn.disabled = false;
         }
     });
-
-    async function deletePrompt(id) {
-        if (!confirm('Delete this prompt?')) return;
-        try {
-            var resp = await fetch('/api/ai-generate/prompts/' + id, { method: 'DELETE' });
-            if (!resp.ok) {
-                var err = await resp.json();
-                throw new Error(err.error || 'Delete failed');
-            }
-            await loadPrompts();
-        } catch (e) {
-            showError(e.message);
-        }
-    }
 
     // Generate
     generateBtn.addEventListener('click', async function () {
@@ -395,7 +371,6 @@
         window.openSaveModal({
             defaultViewName: 'AI Generated',
             onSave: async function (assetId, viewName) {
-                // Fetch the current image as a blob
                 var imgResp = await fetch(currentImageUrl);
                 var blob = await imgResp.blob();
 

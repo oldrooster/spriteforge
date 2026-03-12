@@ -12,6 +12,7 @@
         <div class="header-actions">
             <input type="text" id="header-search" class="header-search" placeholder="Search assets...">
             <button id="header-new-asset-btn" class="btn btn-primary btn-small">+ New Asset</button>
+            <button id="header-generate-btn" class="btn btn-accent btn-small">Generate</button>
             <button id="header-settings-btn" class="btn btn-secondary btn-small" title="Project Settings">&#9881;</button>
         </div>
     </header>
@@ -357,8 +358,7 @@
                             <div class="canvas-zoom-container" id="img-trans-zoom-container">
                                 <canvas id="img-trans-canvas"></canvas>
                             </div>
-                            <div class="setting-group">
-                                <label>Preview Background</label>
+                            <div class="img-trans-canvas-bar">
                                 <div class="preview-bg-options" id="img-trans-bg-options">
                                     <button class="preview-bg-btn active" data-bg="checkerboard" title="Checkerboard">
                                         <span class="checkerboard-swatch"></span>
@@ -373,6 +373,12 @@
                                         <span class="color-swatch" style="background:#0f0"></span>
                                     </button>
                                     <input type="color" id="img-trans-bg-custom" value="#7B2D8E" title="Custom color">
+                                </div>
+                                <div class="zoom-controls">
+                                    <button id="img-trans-zoom-out" class="btn btn-secondary btn-small" title="Zoom out">&minus;</button>
+                                    <span id="img-trans-zoom-display" class="hint">100%</span>
+                                    <button id="img-trans-zoom-in" class="btn btn-secondary btn-small" title="Zoom in">+</button>
+                                    <button id="img-trans-zoom-reset" class="btn btn-secondary btn-small" title="Fit to view">Fit</button>
                                 </div>
                             </div>
                         </div>
@@ -427,16 +433,12 @@
                                 <label class="eraser-size-label">Fill tolerance: <strong id="img-trans-flood-tolerance-display">30</strong></label>
                                 <input type="range" id="img-trans-flood-tolerance-slider" min="0" max="100" value="30" class="slider eraser-slider">
                             </div>
-                            <div class="zoom-controls">
-                                <button id="img-trans-zoom-in" class="btn btn-secondary btn-small" title="Zoom in">+</button>
-                                <button id="img-trans-zoom-out" class="btn btn-secondary btn-small" title="Zoom out">&minus;</button>
-                                <button id="img-trans-zoom-reset" class="btn btn-secondary btn-small" title="Reset zoom">Fit</button>
-                                <span id="img-trans-zoom-display" class="eraser-size-label">100%</span>
-                            </div>
                         </div>
                         <hr>
-                        <button id="img-trans-download-btn" class="btn btn-accent">Download PNG</button>
-                        <button id="img-trans-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
+                        <div class="img-trans-action-btns">
+                            <button id="img-trans-download-btn" class="btn btn-accent">Download</button>
+                            <button id="img-trans-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -464,7 +466,7 @@
                         </div>
                         <div id="resize-file-list" class="resize-file-list" hidden></div>
                         <div id="resize-preview" class="resize-preview" hidden>
-                            <div class="resize-preview-panels">
+                            <div class="resize-preview-stacked">
                                 <div class="resize-preview-panel">
                                     <label>Original</label>
                                     <div class="resize-preview-img-wrap">
@@ -543,12 +545,14 @@
                                 <label class="loop-label"><input type="checkbox" id="resize-flip-v"> Flip Vertical</label>
                             </div>
                         </div>
-                        <button id="resize-btn" class="btn btn-primary" disabled style="width:100%">Resize Images</button>
+                        <hr>
                         <div id="resize-progress" class="progress-bar" hidden>
                             <div class="progress-fill indeterminate"></div>
                         </div>
-                        <button id="resize-download-btn" class="btn btn-accent" hidden>Download Resized ZIP</button>
-                        <button id="resize-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
+                        <div class="resize-action-btns">
+                            <button id="resize-download-btn" class="btn btn-accent">Download</button>
+                            <button id="resize-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -580,6 +584,12 @@
                             </div>
                             <div class="crop-info-bar">
                                 <span id="crop-image-info" class="hint"></span>
+                                <div class="crop-zoom-controls">
+                                    <button id="crop-zoom-out" class="btn btn-secondary btn-small" title="Zoom out">−</button>
+                                    <span id="crop-zoom-level" class="hint">Fit</span>
+                                    <button id="crop-zoom-in" class="btn btn-secondary btn-small" title="Zoom in">+</button>
+                                    <button id="crop-zoom-fit" class="btn btn-secondary btn-small" title="Fit to view">Fit</button>
+                                </div>
                             </div>
                             <div id="crop-preview-section" hidden>
                                 <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; display: block;">Crop Preview</label>
@@ -623,18 +633,17 @@
                                 <button class="btn btn-secondary btn-small crop-aspect-btn" data-ratio="1:1">1:1</button>
                                 <button class="btn btn-secondary btn-small crop-aspect-btn" data-ratio="4:3">4:3</button>
                                 <button class="btn btn-secondary btn-small crop-aspect-btn" data-ratio="16:9">16:9</button>
+                                <button class="btn btn-secondary btn-small crop-aspect-btn" data-ratio="all">All</button>
                             </div>
                         </div>
-                        <div class="setting-group">
-                            <button id="crop-select-all-btn" class="btn btn-secondary" style="width:100%">Select Entire Image</button>
-                        </div>
                         <hr>
-                        <button id="crop-btn" class="btn btn-primary" style="width:100%">Crop Image</button>
                         <div id="crop-progress" class="progress-bar" hidden>
                             <div class="progress-fill indeterminate"></div>
                         </div>
-                        <button id="crop-download-btn" class="btn btn-accent" hidden>Download Cropped PNG</button>
-                        <button id="crop-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
+                        <div class="crop-action-btns">
+                            <button id="crop-download-btn" class="btn btn-accent">Download</button>
+                            <button id="crop-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -668,7 +677,7 @@
                         </div>
                         <div class="setting-group">
                             <label>Prompt</label>
-                            <textarea id="ai-generate-prompt" class="styled-textarea" rows="4"
+                            <textarea id="ai-generate-prompt" class="styled-textarea" rows="6"
                                 placeholder="A knight character sprite, front-facing, pixel art style..."></textarea>
                         </div>
                         <div class="setting-group">
@@ -687,22 +696,12 @@
                             </div>
                         </div>
                         <div class="setting-group">
-                            <div class="prompt-library-header">
-                                <label>Prompt Library</label>
-                                <button id="ai-generate-add-prompt-btn" class="btn btn-secondary btn-small" title="Add new prompt">+ New</button>
+                            <label>Prompt Library</label>
+                            <div class="prompt-dropdown-wrap">
+                                <input type="text" id="ai-generate-prompt-search" class="styled-select" placeholder="Search prompts...">
+                                <div id="ai-generate-prompt-dropdown" class="prompt-dropdown" hidden></div>
                             </div>
-                            <div class="ai-sample-prompts" id="ai-generate-samples">
-                                <!-- Populated dynamically from /api/ai-generate/prompts -->
-                            </div>
-                            <!-- Prompt editor (shown when adding/editing) -->
-                            <div id="ai-prompt-editor" class="prompt-editor" hidden>
-                                <input type="text" id="ai-prompt-editor-name" class="prompt-editor-input" placeholder="Prompt name (e.g. Fantasy Warrior)">
-                                <textarea id="ai-prompt-editor-text" class="styled-textarea" rows="4" placeholder="Enter prompt text..."></textarea>
-                                <div class="prompt-editor-actions">
-                                    <button id="ai-prompt-editor-save" class="btn btn-primary btn-small">Save</button>
-                                    <button id="ai-prompt-editor-cancel" class="btn btn-secondary btn-small">Cancel</button>
-                                </div>
-                            </div>
+                            <button id="ai-generate-save-prompt-btn" class="btn btn-secondary btn-small" style="margin-top:6px;">Save Current Prompt</button>
                         </div>
                         <button id="ai-generate-btn" class="btn btn-primary" style="width:100%">Generate Sprite</button>
                         <div id="ai-generate-progress" class="progress-bar" hidden>
@@ -779,29 +778,16 @@
                         </div>
                         <div class="setting-group">
                             <label>Animation Prompt</label>
-                            <textarea id="ai-animate-prompt" class="styled-textarea" rows="4"
+                            <textarea id="ai-animate-prompt" class="styled-textarea" rows="6"
                                 placeholder="Walking animation, side view, smooth loop..."></textarea>
                         </div>
                         <div class="setting-group">
-                            <label>Sample Prompts</label>
-                            <div class="ai-sample-prompts" id="ai-animate-samples">
-                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
-                                    data-prompt="Walking animation cycle, side view, moving to the right, smooth looping motion, consistent character design">Walk Right</button>
-                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
-                                    data-prompt="Walking animation cycle, side view, moving to the left, smooth looping motion, consistent character design">Walk Left</button>
-                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
-                                    data-prompt="Walking animation, front-facing view, walking towards the camera, smooth looping motion">Walk Forward</button>
-                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
-                                    data-prompt="Walking animation, back view, walking away from camera, smooth looping motion">Walk Backward</button>
-                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
-                                    data-prompt="Idle breathing animation, subtle up and down motion, front-facing, smooth loop, minimal movement">Idle/Breathing</button>
-                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
-                                    data-prompt="Talking animation, mouth opening and closing, subtle head movement, front-facing, smooth loop">Talking</button>
-                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
-                                    data-prompt="Attack animation, swinging weapon forward, side view, quick motion, return to idle pose">Attack</button>
-                                <button class="btn btn-secondary btn-small ai-animate-sample-btn"
-                                    data-prompt="Jump animation, crouching then leaping up and landing, front view, smooth arc motion">Jump</button>
+                            <label>Prompt Library</label>
+                            <div class="prompt-dropdown-wrap">
+                                <input type="text" id="ai-animate-prompt-search" class="styled-select" placeholder="Search prompts...">
+                                <div id="ai-animate-prompt-dropdown" class="prompt-dropdown" hidden></div>
                             </div>
+                            <button id="ai-animate-save-prompt-btn" class="btn btn-secondary btn-small" style="margin-top:6px;">Save Current Prompt</button>
                         </div>
                         <div class="setting-group">
                             <label class="toggle-label">
@@ -904,28 +890,69 @@
     <!-- Create Asset Modal -->
     <!-- Project Settings Modal -->
     <div id="project-settings-modal" class="modal-overlay" hidden>
-        <div class="modal-dialog modal-dialog-sm">
+        <div class="modal-dialog modal-dialog-md">
             <div class="modal-header">
                 <h3>Project Settings</h3>
                 <button id="project-settings-close" class="btn btn-secondary btn-small">X</button>
             </div>
             <div class="modal-body">
-                <div class="setting-group">
-                    <label>Project Name</label>
-                    <input type="text" id="project-settings-name" class="styled-select" placeholder="My Project">
+                <div class="settings-tabs">
+                    <button class="settings-tab active" data-tab="general">General</button>
+                    <button class="settings-tab" data-tab="prompts">Prompt Library</button>
                 </div>
-                <div class="setting-group">
-                    <label>Art Style <span class="hint">(use <code>{{art_style}}</code> in prompts to inject this)</span></label>
-                    <textarea id="project-settings-art-style" class="styled-select" rows="3" placeholder="e.g. VGA pixel art, 320x200, 256 color palette, Sierra adventure game style"></textarea>
-                </div>
-                <div class="setting-group">
-                    <label>Default Resolution</label>
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <input type="number" id="project-settings-res-w" class="styled-select" style="width:80px;" min="1" placeholder="64">
-                        <span>&times;</span>
-                        <input type="number" id="project-settings-res-h" class="styled-select" style="width:80px;" min="1" placeholder="64">
-                        <span class="hint">px</span>
+                <div class="settings-tab-content active" id="settings-tab-general">
+                    <div class="setting-group">
+                        <label>Project Name</label>
+                        <input type="text" id="project-settings-name" class="styled-select" placeholder="My Project">
                     </div>
+                    <div class="setting-group">
+                        <label>Art Style <span class="hint">(use <code>{{art_style}}</code> in prompts to inject this)</span></label>
+                        <textarea id="project-settings-art-style" class="styled-select" rows="3" placeholder="e.g. VGA pixel art, 320x200, 256 color palette, Sierra adventure game style"></textarea>
+                    </div>
+                    <div class="setting-group">
+                        <label>Default Resolution</label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="number" id="project-settings-res-w" class="styled-select" style="width:80px;" min="1" placeholder="64">
+                            <span>&times;</span>
+                            <input type="number" id="project-settings-res-h" class="styled-select" style="width:80px;" min="1" placeholder="64">
+                            <span class="hint">px</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-tab-content" id="settings-tab-prompts">
+                    <div class="prompt-library-header">
+                        <label>Manage Prompts</label>
+                        <button id="settings-add-prompt-btn" class="btn btn-primary btn-small">+ New Prompt</button>
+                    </div>
+                    <div id="settings-prompt-editor" class="prompt-editor" hidden>
+                        <input type="text" id="settings-prompt-editor-name" class="prompt-editor-input" placeholder="Prompt name (e.g. Fantasy Warrior)">
+                        <textarea id="settings-prompt-editor-text" class="styled-textarea" rows="4" placeholder="Enter prompt text..."></textarea>
+                        <div style="display:flex;gap:8px;">
+                            <div class="setting-group" style="flex:1;margin:0;">
+                                <label>Category</label>
+                                <select id="settings-prompt-editor-category" class="styled-select">
+                                    <option value="characters">Characters</option>
+                                    <option value="backgrounds">Backgrounds</option>
+                                    <option value="objects">Objects</option>
+                                    <option value="ui">UI</option>
+                                    <option value="sounds">Sounds</option>
+                                </select>
+                            </div>
+                            <div class="setting-group" style="flex:1;margin:0;">
+                                <label>Generation Type</label>
+                                <select id="settings-prompt-editor-gentype" class="styled-select">
+                                    <option value="image">Image</option>
+                                    <option value="video">Video</option>
+                                    <option value="both">Both</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="prompt-editor-actions">
+                            <button id="settings-prompt-editor-save" class="btn btn-primary btn-small">Save</button>
+                            <button id="settings-prompt-editor-cancel" class="btn btn-secondary btn-small">Cancel</button>
+                        </div>
+                    </div>
+                    <div id="settings-prompt-list" class="ai-sample-prompts"></div>
                 </div>
             </div>
             <div class="modal-footer">

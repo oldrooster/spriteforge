@@ -1,23 +1,25 @@
-# Adventure Forge
+# SpriteForge
 
-An AI-powered sprite creation toolkit for game developers. Generate sprites with AI, animate them with video generation, extract frames from video, apply transparency, and export PNGs ready for your game engine.
+An AI-powered sprite creation toolkit for game developers. Generate sprites with AI, animate them with video generation, extract frames from video, apply transparency, crop, resize, and export PNGs ready for your game engine.
 
 ## Features
 
-- **AI Sprite Generation** - Generate sprite images from text prompts using Google Gemini, with iterative refinement, reference image support (upload or clipboard paste), and save to library
-- **AI Animation** - Animate sprites from your library using Veo video generation, with configurable duration (4-8s), audio toggle, sample prompts, and save videos to library
+- **Project & Asset Library** - Organize sprites into assets with categories (Characters, Backgrounds, Objects, UI, Sounds), tags, and multiple views per asset
+- **AI Sprite Generation** - Generate sprite images from text prompts using Google Gemini, with iterative refinement, reference image support (upload, library, or clipboard paste), and save to library
+- **AI Animation** - Animate sprites from your library using Veo video generation, with configurable duration (4-8s), audio toggle, prompt library, and save videos to library
+- **Prompt Library** - Centralized prompt management in project settings with name, category, and generation type (Image/Video/Both); filterable type-ahead dropdown integrated into both AI tools; save prompts directly from the prompt textarea
 - **Video to Frames** - Upload MP4, WebM, MOV, AVI, or MKV video files via drag-and-drop, crop a region, and extract animation frames
 - **Animation Preview** - Preview extracted frames as an animation with adjustable speed and filmstrip view
 - **Background Transparency**
   - Color-based removal with tolerance and edge-only mode (preserves interior pixels like eyes)
   - AI-powered background removal using rembg (u2net)
   - Manual brush eraser and flood fill for touch-up corrections
-  - Zoom up to 8x for fine detail work
-- **Crop Tool** - Crop individual images with visual selection
-- **Resize Images** - Batch resize with aspect lock, percentage scaling, mirror/flip, and interpolation options
-- **Sprite Library** - Persistent catalog for organizing sprites, animation loops, and generated videos
+  - Zoom from 10% to 8x for fine detail work
+- **Crop Tool** - Crop individual images with visual selection, zoom/pan support, aspect ratio presets (including "All" for full image), and unified Download/Save buttons
+- **Resize Images** - Batch resize with aspect lock, percentage scaling, mirror/flip, interpolation options, stacked preview, and smart PNG/ZIP download
+- **Markup Tool** - Annotate images with drawing tools
 - **Configurable Preview** - Switch preview background between checkerboard, solid colors, or custom color
-- **Export** - Download all frames as a ZIP of transparent PNGs
+- **Export** - Download frames as ZIP or single PNG depending on context
 
 ## Quick Start
 
@@ -78,9 +80,9 @@ The AI features show a helpful error message if no backend is configured. All ot
 ## Workflow
 
 ### AI Sprite Creation
-1. **Generate** a sprite with a text prompt (optionally with a reference image)
+1. **Generate** a sprite with a text prompt (optionally with a reference image), or use the standalone **Generate** button from the home screen
 2. **Refine** iteratively until satisfied
-3. **Save** to the Sprite Library
+3. **Save** to an asset in the library
 4. **Animate** using AI video generation with configurable duration and audio
 
 ### Video Frame Extraction

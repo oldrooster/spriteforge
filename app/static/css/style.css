@@ -884,7 +884,23 @@ hr {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: 8px;
+    margin-top: 0;
+}
+
+.img-trans-canvas-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.img-trans-action-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.img-trans-action-btns .btn {
+    flex: 1;
 }
 
 .zoom-controls .btn-small {
@@ -974,6 +990,21 @@ hr {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+}
+
+.resize-preview-stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.resize-action-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.resize-action-btns .btn {
+    flex: 1;
 }
 
 .resize-preview-panel {
@@ -1750,22 +1781,54 @@ hr {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    overflow: hidden;
+    overflow: auto;
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 200px;
+    max-height: 70vh;
 }
 
 .crop-canvas-wrap canvas {
-    max-width: 100%;
     display: block;
     image-rendering: pixelated;
 }
 
+.crop-canvas-wrap.zoomed {
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+.crop-canvas-wrap.fit canvas {
+    max-width: 100%;
+}
+
 .crop-info-bar {
     margin-top: 6px;
-    text-align: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.crop-zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.crop-zoom-controls .btn {
+    min-width: 28px;
+    padding: 2px 6px;
+    font-size: 14px;
+}
+
+.crop-action-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.crop-action-btns .btn {
+    flex: 1;
 }
 
 .crop-preview-wrap {
@@ -2303,4 +2366,105 @@ hr {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
+}
+
+/* Settings Tabs */
+.settings-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+}
+
+.settings-tab {
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.settings-tab:hover {
+    color: var(--text-primary);
+}
+
+.settings-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.settings-tab-content {
+    display: none;
+}
+
+.settings-tab-content.active {
+    display: block;
+}
+
+/* Modal dialog medium size */
+.modal-dialog-md {
+    max-width: 560px;
+}
+
+/* Prompt Dropdown */
+.prompt-dropdown-wrap {
+    position: relative;
+}
+
+.prompt-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.prompt-dropdown-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+    transition: background 0.1s;
+}
+
+.prompt-dropdown-item:hover {
+    background: var(--bg-card);
+}
+
+.prompt-dropdown-item-name {
+    font-weight: 600;
+}
+
+.prompt-dropdown-item-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+.prompt-dropdown-empty {
+    padding: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Settings prompt list in modal */
+#settings-prompt-list .prompt-item .prompt-item-meta {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-left: 6px;
 }

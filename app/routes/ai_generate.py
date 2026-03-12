@@ -80,24 +80,32 @@ DEFAULT_PROMPTS = [
         'id': 'pixel-art-character',
         'name': 'Pixel Art Character',
         'prompt': 'A character sprite, front-facing idle pose, pixel art style, solid green background (#00FF00), no shadows, clean edges, 128x128 pixels',
+        'category': 'characters',
+        'gen_type': 'image',
         'builtin': True,
     },
     {
         'id': 'fantasy-warrior',
         'name': 'Fantasy Warrior',
         'prompt': 'A fantasy warrior sprite, side view walking pose, clean flat colors, solid magenta background (#FF00FF), no shadows, no ground shadow, game-ready, transparent-friendly',
+        'category': 'characters',
+        'gen_type': 'image',
         'builtin': True,
     },
     {
         'id': 'cute-animal',
         'name': 'Cute Animal',
         'prompt': 'A cute animal sprite, front-facing, chibi style, solid blue background (#0000FF), no shadows, no reflections, clean sharp edges, game sprite',
+        'category': 'characters',
+        'gen_type': 'image',
         'builtin': True,
     },
     {
         'id': 'spaceship-topdown',
         'name': 'Spaceship Top-Down',
         'prompt': 'A spaceship top-down view sprite, clean vector style, solid green background (#00FF00), no shadows, no glow effects, game asset, transparent-friendly',
+        'category': 'objects',
+        'gen_type': 'image',
         'builtin': True,
     },
 ]
@@ -136,11 +144,16 @@ def create_prompt():
     if not name or not prompt:
         return jsonify({'error': 'Name and prompt are required'}), 400
 
+    category = data.get('category', 'characters')
+    gen_type = data.get('gen_type', 'both')
+
     prompts = _read_prompts()
     new_prompt = {
         'id': str(uuid.uuid4())[:8],
         'name': name,
         'prompt': prompt,
+        'category': category,
+        'gen_type': gen_type,
         'builtin': False,
     }
     prompts.append(new_prompt)
@@ -156,11 +169,18 @@ def update_prompt(prompt_id):
     if not name or not prompt:
         return jsonify({'error': 'Name and prompt are required'}), 400
 
+    category = data.get('category', None)
+    gen_type = data.get('gen_type', None)
+
     prompts = _read_prompts()
     for p in prompts:
         if p['id'] == prompt_id:
             p['name'] = name
             p['prompt'] = prompt
+            if category is not None:
+                p['category'] = category
+            if gen_type is not None:
+                p['gen_type'] = gen_type
             _write_prompts(prompts)
             return jsonify(p)
     return jsonify({'error': 'Prompt not found'}), 404

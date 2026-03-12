@@ -36,6 +36,11 @@ function parseRoute(hash) {
     if (toolMatch) {
         return { view: 'tool', assetId: toolMatch[1], tool: toolMatch[2] };
     }
+    // #/tool/<name> (standalone tool, no asset)
+    const standaloneToolMatch = h.match(/^tool\/(.+)$/);
+    if (standaloneToolMatch) {
+        return { view: 'tool', assetId: null, tool: standaloneToolMatch[1] };
+    }
     // #/asset/<id>
     const assetMatch = h.match(/^asset\/([^/]+)$/);
     if (assetMatch) {
@@ -71,7 +76,7 @@ function applyRoute() {
         state.currentAssetId = route.assetId;
         document.getElementById('asset-detail').classList.add('active');
     } else if (route.view === 'tool') {
-        state.currentAssetId = route.assetId;
+        state.currentAssetId = route.assetId || null;
         const panelId = toolPanelMap[route.tool];
         if (panelId) {
             const panel = document.getElementById(panelId);
