@@ -239,11 +239,24 @@
 
     let saveCallback = null;
 
+    let saveMode = 'view'; // 'view' or 'resource'
+
     async function openSaveModal(options) {
-        // options: { onSave(assetId, viewName), defaultLoopName }
+        // options: { onSave(assetId, name), defaultName, mode: 'view'|'resource' }
         saveCallback = options.onSave;
         saveStatus.textContent = '';
-        saveViewName.value = options.defaultLoopName || 'Untitled View';
+        saveMode = options.mode || 'view';
+
+        const nameLabel = document.getElementById('save-library-name-label');
+        if (saveMode === 'resource') {
+            nameLabel.textContent = 'Resource Name';
+            saveViewName.placeholder = 'e.g. ai-generated.png';
+            saveViewName.value = options.defaultName || 'AI Generated';
+        } else {
+            nameLabel.textContent = 'View Name';
+            saveViewName.placeholder = 'e.g. Walk Right';
+            saveViewName.value = options.defaultName || options.defaultViewName || options.defaultLoopName || 'Untitled View';
+        }
 
         // Load assets for dropdown
         try {
@@ -306,7 +319,7 @@
 
     saveConfirm.addEventListener('click', async () => {
         const mode = document.querySelector('input[name="save-lib-sprite-mode"]:checked').value;
-        const viewName = saveViewName.value.trim() || 'Untitled View';
+        const viewName = saveViewName.value.trim() || (saveMode === 'resource' ? 'AI Generated' : 'Untitled View');
         let assetId;
 
         saveConfirm.disabled = true;

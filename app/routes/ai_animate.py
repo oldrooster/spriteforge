@@ -15,11 +15,16 @@ MODELS_AI_STUDIO = [
 ]
 
 MODELS_VERTEX_AI = [
-    {'id': 'veo-3.1-generate-001', 'name': 'Veo 3.1 (Latest)', 'default': True},
-    {'id': 'veo-3.1-fast-generate-001', 'name': 'Veo 3.1 Fast', 'default': False},
-    {'id': 'veo-3.0-generate-001', 'name': 'Veo 3.0 (Standard)', 'default': False},
-    {'id': 'veo-3.0-fast-generate-001', 'name': 'Veo 3.0 Fast', 'default': False},
-    {'id': 'veo-2.0-generate-001', 'name': 'Veo 2.0 (Standard)', 'default': False},
+    {'id': 'veo-3.1-generate-001', 'name': 'Veo 3.1 (Latest) - ~$0.40/sec', 'default': True},
+    {'id': 'veo-3.1-fast-generate-001', 'name': 'Veo 3.1 Fast - ~$0.15/sec', 'default': False},
+    {'id': 'veo-3.1-generate-preview', 'name': 'Veo 3.1 Preview - ~$0.40/sec', 'default': False},
+    {'id': 'veo-3.1-fast-generate-preview', 'name': 'Veo 3.1 Fast Preview - ~$0.15/sec', 'default': False},
+    {'id': 'veo-3.0-generate-001', 'name': 'Veo 3.0 - ~$0.36/sec', 'default': False},
+    {'id': 'veo-3.0-fast-generate-001', 'name': 'Veo 3.0 Fast - ~$0.15/sec', 'default': False},
+    {'id': 'veo-3.0-generate-preview', 'name': 'Veo 3.0 Preview - ~$0.36/sec', 'default': False},
+    {'id': 'veo-3.0-fast-generate-preview', 'name': 'Veo 3.0 Fast Preview - ~$0.15/sec', 'default': False},
+    {'id': 'veo-2.0-generate-001', 'name': 'Veo 2.0 - ~$0.50/sec', 'default': False},
+    {'id': 'veo-2.0-generate-exp', 'name': 'Veo 2.0 Experimental - ~$0.50/sec', 'default': False},
 ]
 
 
@@ -360,7 +365,7 @@ def animate():
         res = next((r for r in asset_data.get('resources', []) if r['id'] == resource_id), None)
         if not res:
             return jsonify({'error': 'Resource not found'}), 404
-        image_path = os.path.join(lib_root, 'assets', asset_id, 'resources', res['filename'])
+        image_path = os.path.join(lib_root, 'assets', asset_id, 'resources', res['stored_name'])
     else:
         frame_name = f'frame_{int(frame_index):04d}.png'
         image_path = os.path.join(lib_root, 'assets', asset_id, 'views', view_id, frame_name)
@@ -380,7 +385,8 @@ def animate():
 
     if _is_vertex():
         gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-        gcp_location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'us-central1').strip()
+        # Video models (Veo) require a regional endpoint, not global
+        gcp_location = os.environ.get('GOOGLE_CLOUD_VIDEO_LOCATION', 'us-central1').strip()
         thread = threading.Thread(
             target=_run_video_generation_vertex,
             args=(session_dir, image_path, prompt, model_name, gcp_project, gcp_location, generate_audio, duration),

@@ -2264,13 +2264,19 @@ hr {
 
 /* ── Card Filename Label ── */
 .resource-card-name {
-    padding: 6px 8px;
+    padding: 6px 8px 0;
     font-size: 11px;
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: center;
+}
+.resource-card-dims {
+    font-size: 10px;
+    color: var(--text-muted, #888);
+    text-align: center;
+    padding: 2px 8px 4px;
 }
 
 /* ── Context Menu ── */

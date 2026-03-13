@@ -803,11 +803,7 @@
                         <span id="ai-animate-status-text" class="hint" hidden>Generating video... this may take 1-2 minutes</span>
                         <div id="ai-animate-actions" hidden>
                             <hr>
-                            <div class="setting-group">
-                                <label>Video Name</label>
-                                <input type="text" id="ai-animate-video-name" class="styled-input" placeholder="AI Animation" value="AI Animation">
-                            </div>
-                            <button id="ai-animate-save-btn" class="btn btn-accent" style="width:100%">Save Video to Library</button>
+                            <button id="ai-animate-save-btn" class="btn btn-accent" style="width:100%">Save to Library</button>
                             <button id="ai-animate-download-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Download Video</button>
                         </div>
                         <div id="ai-animate-error" class="ai-error-msg" hidden></div>
@@ -1084,8 +1080,8 @@
                         <option value="sounds">Sounds</option>
                     </select>
                 </div>
-                <div class="setting-group">
-                    <label>View Name</label>
+                <div class="setting-group" id="save-library-name-group">
+                    <label id="save-library-name-label">View Name</label>
                     <input type="text" id="save-library-loop-name" class="styled-select" placeholder="e.g. Walk Right" value="Untitled View">
                 </div>
             </div>

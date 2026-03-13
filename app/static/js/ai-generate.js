@@ -369,17 +369,17 @@
         if (typeof window.openSaveModal !== 'function') return;
 
         window.openSaveModal({
-            defaultViewName: 'AI Generated',
-            onSave: async function (assetId, viewName) {
+            mode: 'resource',
+            defaultName: 'AI Generated.png',
+            onSave: async function (assetId, resourceName) {
                 var imgResp = await fetch(currentImageUrl);
                 var blob = await imgResp.blob();
 
+                var filename = resourceName.endsWith('.png') ? resourceName : resourceName + '.png';
                 var formData = new FormData();
-                formData.append('name', viewName);
-                formData.append('delay', 100);
-                formData.append('frames', blob, 'frame_0001.png');
+                formData.append('file', blob, filename);
 
-                var resp = await fetch('/api/assets/' + assetId + '/views', {
+                var resp = await fetch('/api/assets/' + assetId + '/resources', {
                     method: 'POST',
                     body: formData,
                 });

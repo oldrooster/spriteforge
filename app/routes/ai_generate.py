@@ -24,22 +24,16 @@ def _is_vertex():
     return bool(os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip())
 
 
-# Gemini 3.x preview models require the global endpoint on Vertex AI
-_GLOBAL_MODELS = {'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'}
-
 
 def _get_client(model_name=None):
     from google import genai
 
     # Prefer Vertex AI if configured, fall back to API key
     gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-    gcp_location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'us-central1').strip()
+    gcp_location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'global').strip()
     api_key = os.environ.get('GEMINI_API_KEY', '').strip()
 
     if gcp_project:
-        # Gemini 3.x preview models need the global endpoint
-        if model_name in _GLOBAL_MODELS:
-            gcp_location = 'global'
         client = genai.Client(vertexai=True, project=gcp_project, location=gcp_location)
         return client, None
 

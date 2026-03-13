@@ -238,6 +238,17 @@
         nameLabel.title = res.filename;
         card.appendChild(nameLabel);
 
+        // Image dimensions (loaded async)
+        if (displayType === 'image') {
+            const dimLabel = el('div', 'resource-card-dims');
+            card.appendChild(dimLabel);
+            const probe = new Image();
+            probe.onload = function () {
+                dimLabel.textContent = probe.naturalWidth + ' × ' + probe.naturalHeight;
+            };
+            probe.src = fileUrl;
+        }
+
         return card;
     }
 

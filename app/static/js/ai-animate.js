@@ -12,7 +12,6 @@
     const resultSection = document.getElementById('ai-animate-result');
     const videoEl = document.getElementById('ai-animate-video');
     const actionsSection = document.getElementById('ai-animate-actions');
-    const videoNameInput = document.getElementById('ai-animate-video-name');
     const saveBtn = document.getElementById('ai-animate-save-btn');
     const downloadBtn = document.getElementById('ai-animate-download-btn');
     const errorEl = document.getElementById('ai-animate-error');
@@ -303,31 +302,31 @@
         }
     }
 
-    // Save video to sprite library
-    saveBtn.addEventListener('click', async function () {
-        if (!sessionId || !selectedSprite) return;
+    // Save video to sprite library via save modal
+    saveBtn.addEventListener('click', function () {
+        if (!sessionId) return;
+        if (typeof window.openSaveModal !== 'function') return;
 
-        saveBtn.disabled = true;
-        errorEl.hidden = true;
+        window.openSaveModal({
+            mode: 'resource',
+            defaultName: 'AI Animation.mp4',
+            onSave: async function (assetId, resourceName) {
+                var videoUrl = '/api/ai-animate/video/' + sessionId + '/output.mp4';
+                var videoResp = await fetch(videoUrl);
+                var blob = await videoResp.blob();
 
-        try {
-            var resp = await fetch('/api/ai-animate/save-video-to-library', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    asset_id: selectedSprite.asset_id,
-                    video_name: videoNameInput.value.trim() || 'AI Animation',
-                }),
-            });
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || 'Failed to save');
-            alert('Video saved to sprite library!');
-        } catch (err) {
-            showError(err.message);
-        } finally {
-            saveBtn.disabled = false;
-        }
+                var filename = resourceName.endsWith('.mp4') ? resourceName : resourceName + '.mp4';
+                var formData = new FormData();
+                formData.append('file', blob, filename);
+
+                var resp = await fetch('/api/assets/' + assetId + '/resources', {
+                    method: 'POST',
+                    body: formData,
+                });
+                var data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Failed to save');
+            },
+        });
     });
 
     // Download video
