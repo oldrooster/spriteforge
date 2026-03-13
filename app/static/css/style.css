@@ -2251,6 +2251,13 @@ hr {
     opacity: 1;
 }
 
+/* On touch devices, always show the menu button since there's no hover */
+@media (hover: none) {
+    .resource-card-menu-btn {
+        opacity: 1;
+    }
+}
+
 .resource-card-menu-btn:hover {
     background: rgba(0, 0, 0, 0.7);
 }
