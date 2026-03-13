@@ -142,6 +142,12 @@ def download_resized(session_id):
 
     # Single file: return PNG directly
     fmt = request.args.get('format')
+    index = request.args.get('index')
+    if fmt == 'single' and index is not None:
+        idx = int(index)
+        if 0 <= idx < len(files):
+            return send_from_directory(output_dir, files[idx], as_attachment=True, download_name=files[idx])
+        return jsonify({'error': 'Index out of range'}), 404
     if fmt == 'single' and len(files) == 1:
         return send_from_directory(output_dir, files[0], as_attachment=True, download_name=files[0])
 

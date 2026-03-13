@@ -680,6 +680,7 @@ h2 {
 .btn-small {
     padding: 6px 12px;
     font-size: 12px;
+    white-space: nowrap;
 }
 
 /* Canvas / Preview */
@@ -2362,10 +2363,107 @@ hr {
     gap: 6px;
 }
 
+.markup-tool-grid {
+    flex-wrap: wrap;
+}
+
+.markup-tool-grid .btn {
+    min-width: 56px;
+    flex: 1;
+}
+
 .markup-tool-btns .btn.active {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
+}
+
+/* Font preview */
+.markup-font-preview {
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    height: 56px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+}
+
+.markup-font-preview span {
+    color: var(--text-primary);
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+/* Layers panel */
+.markup-layers-panel {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-primary);
+}
+
+.markup-layer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.markup-layer-item:last-child {
+    border-bottom: none;
+}
+
+.markup-layer-item:hover {
+    background: var(--bg-secondary);
+}
+
+.markup-layer-item.selected {
+    background: var(--accent);
+    color: #fff;
+}
+
+.markup-layer-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.markup-layer-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-left: 4px;
+}
+
+.markup-layer-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.markup-layer-item.selected .markup-layer-btn {
+    color: rgba(255,255,255,0.8);
+}
+
+.markup-layer-btn:hover {
+    background: rgba(255,255,255,0.15);
+}
+
+.markup-layer-btn-del:hover {
+    color: var(--accent);
 }
 
 /* Settings Tabs */
@@ -2467,4 +2565,96 @@ hr {
     font-size: 10px;
     color: var(--text-secondary);
     margin-left: 6px;
+}
+
+/* Frame navigation bar (transparency view mode) */
+.frame-nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.frame-nav-info {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 120px;
+    text-align: center;
+}
+
+/* View crop/resize status messages */
+.view-crop-status,
+.view-resize-status {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+/* Resource filter bar */
+.resource-filter-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.resource-filter-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+/* Resource preview overlay */
+.resource-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    animation: fadeIn 0.15s ease;
+}
+
+.resource-preview-box {
+    position: relative;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    max-width: 80vw;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.resource-preview-box img {
+    max-width: 100%;
+    max-height: 70vh;
+    image-rendering: pixelated;
+    border-radius: 4px;
+}
+
+.resource-preview-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    min-width: 28px;
+    justify-content: center;
+}
+
+.resource-preview-name {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: center;
 }

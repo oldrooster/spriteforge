@@ -348,18 +348,31 @@
 
         resizeSaveLibraryBtn.disabled = true;
         try {
-            const resp = await fetch('/api/save-resized-to-library', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    session_id: result.sessionId,
-                    asset_id: librarySource.asset_id,
-                    frames: librarySource.frames,
-                }),
-            });
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || 'Save failed');
-            alert('Saved ' + data.count + ' frame(s) to sprite library!');
+            if (librarySource.source_type === 'resource') {
+                // For resources, download the resized file and PUT back
+                var dlResp = await fetch('/api/download-resized/' + result.sessionId + '?format=single');
+                var blob = await dlResp.blob();
+                var formData = new FormData();
+                formData.append('file', blob, librarySource.filename);
+                var url = '/api/assets/' + librarySource.asset_id + '/resources/' + librarySource.resource_id + '/file';
+                var resp = await fetch(url, { method: 'PUT', body: formData });
+                var data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Save failed');
+                alert('Saved to sprite library!');
+            } else {
+                const resp = await fetch('/api/save-resized-to-library', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: result.sessionId,
+                        asset_id: librarySource.asset_id,
+                        frames: librarySource.frames,
+                    }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Save failed');
+                alert('Saved ' + data.count + ' frame(s) to sprite library!');
+            }
         } catch (err) {
             alert('Failed to save: ' + err.message);
         } finally {
@@ -397,19 +410,134 @@
     });
     _fileListObserver.observe(fileListEl, { childList: true });
 
-    // Phase C: consume pending resource from context menu
+    // ── View mode: resize all frames and save back ──
+    let viewMode = null;
+
+    const viewSaveBtn = document.createElement('button');
+    viewSaveBtn.className = 'btn btn-primary';
+    viewSaveBtn.textContent = 'Resize & Save All Frames';
+    viewSaveBtn.hidden = true;
+    viewSaveBtn.style.marginTop = '8px';
+    downloadBtn.parentNode.insertBefore(viewSaveBtn, downloadBtn.nextSibling);
+
+    const viewStatusEl = document.createElement('div');
+    viewStatusEl.className = 'view-resize-status hint';
+    viewStatusEl.hidden = true;
+    viewSaveBtn.parentNode.insertBefore(viewStatusEl, viewSaveBtn.nextSibling);
+
+    viewSaveBtn.addEventListener('click', async () => {
+        if (!viewMode || files.length === 0) return;
+
+        viewSaveBtn.disabled = true;
+        viewStatusEl.hidden = false;
+        viewStatusEl.textContent = 'Resizing ' + viewMode.frame_count + ' frames...';
+
+        const result = await doResize();
+        if (!result) {
+            viewSaveBtn.disabled = false;
+            viewStatusEl.textContent = 'Resize failed';
+            return;
+        }
+
+        viewStatusEl.textContent = 'Saving frames back to library...';
+        try {
+            // Download each resized frame and PUT back
+            for (let i = 0; i < viewMode.frame_count; i++) {
+                const frameName = 'frame_' + String(i + 1).padStart(4, '0') + '.png';
+                const dlResp = await fetch('/api/download-resized/' + result.sessionId + '?format=single&index=' + i);
+                const blob = await dlResp.blob();
+                const formData = new FormData();
+                formData.append('image', blob, frameName);
+                const url = '/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id + '/frames/' + frameName;
+                const resp = await fetch(url, { method: 'PUT', body: formData });
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    throw new Error(data.error || 'Failed to save frame ' + (i + 1));
+                }
+            }
+
+            // Update view dimensions
+            const mode = document.querySelector('input[name="resize-mode"]:checked').value;
+            let newW, newH;
+            if (mode === 'percentage') {
+                const s = parseInt(scaleSlider.value) / 100;
+                newW = Math.max(1, Math.round(viewMode.width * s));
+                newH = Math.max(1, Math.round(viewMode.height * s));
+            } else {
+                newW = parseInt(widthInput.value) || 1;
+                newH = parseInt(heightInput.value) || 1;
+            }
+            await fetch('/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ width: newW, height: newH }),
+            });
+
+            viewStatusEl.textContent = 'Resized ' + viewMode.frame_count + ' frames to ' + newW + 'x' + newH;
+        } catch (err) {
+            viewStatusEl.textContent = 'Error: ' + err.message;
+        } finally {
+            viewSaveBtn.disabled = false;
+        }
+    });
+
+    // Phase C: consume pending view or resource from context menu
     const resizeToolPanel = document.getElementById('tool-resize-images');
     if (resizeToolPanel) {
         new MutationObserver(async () => {
-            if (resizeToolPanel.classList.contains('active') && state.pendingToolResource) {
+            if (!resizeToolPanel.classList.contains('active')) return;
+
+            // View mode: resize all frames
+            if (state.pendingToolView) {
+                const pending = state.pendingToolView;
+                state.pendingToolView = null;
+                viewMode = pending;
+
+                // Load all frames as files
+                const newFiles = [];
+                for (let i = 1; i <= pending.frame_count; i++) {
+                    const frameName = 'frame_' + String(i).padStart(4, '0') + '.png';
+                    const frameUrl = '/api/assets/' + pending.asset_id + '/views/' + pending.view_id + '/frames/' + frameName;
+                    try {
+                        const resp = await fetch(frameUrl);
+                        const blob = await resp.blob();
+                        newFiles.push(new File([blob], frameName, { type: 'image/png' }));
+                    } catch (err) {
+                        console.error('Failed to fetch frame:', err);
+                    }
+                }
+                if (newFiles.length > 0) {
+                    librarySource = null;
+                    handleFiles(newFiles);
+                    // Hide regular buttons, show view mode
+                    downloadBtn.hidden = true;
+                    resizeSaveLibraryBtn.hidden = true;
+                    viewSaveBtn.hidden = false;
+                    originalInfo.textContent = pending.width + ' x ' + pending.height + 'px (' + pending.frame_count + ' frames in ' + pending.view_name + ')';
+                }
+                return;
+            }
+
+            // Resource mode
+            if (state.pendingToolResource) {
                 const pending = state.pendingToolResource;
                 state.pendingToolResource = null;
+                viewMode = null;
+                viewSaveBtn.hidden = true;
+                viewStatusEl.hidden = true;
+                downloadBtn.hidden = false;
                 try {
                     const resp = await fetch(pending.resource_url);
                     const blob = await resp.blob();
                     const file = new File([blob], pending.filename, { type: blob.type || 'image/png' });
-                    librarySource = null;
+                    librarySource = {
+                        asset_id: pending.asset_id,
+                        resource_id: pending.resource_id,
+                        filename: pending.filename,
+                        source_type: 'resource',
+                    };
                     handleFiles([file]);
+                    resizeSaveLibraryBtn.hidden = false;
                 } catch (err) {
                     alert('Failed to load resource: ' + err.message);
                 }

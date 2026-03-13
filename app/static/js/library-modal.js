@@ -232,6 +232,7 @@
     const saveModalClose = document.getElementById('save-library-modal-close');
     const saveAssetSelect = document.getElementById('save-library-sprite-select');
     const saveNewAssetName = document.getElementById('save-library-new-sprite-name');
+    const saveNewAssetCategory = document.getElementById('save-library-new-sprite-category');
     const saveViewName = document.getElementById('save-library-loop-name');
     const saveConfirm = document.getElementById('save-library-confirm');
     const saveStatus = document.getElementById('save-library-status');
@@ -260,6 +261,7 @@
                 document.querySelector('input[name="save-lib-sprite-mode"][value="new"]').checked = true;
                 saveAssetSelect.hidden = true;
                 saveNewAssetName.hidden = false;
+                saveNewAssetCategory.hidden = false;
             } else {
                 // Pre-select current asset if available
                 if (state.currentAssetId) {
@@ -268,12 +270,14 @@
                 document.querySelector('input[name="save-lib-sprite-mode"][value="existing"]').checked = true;
                 saveAssetSelect.hidden = false;
                 saveNewAssetName.hidden = true;
+                saveNewAssetCategory.hidden = true;
             }
         } catch (e) {
             saveAssetSelect.innerHTML = '';
             document.querySelector('input[name="save-lib-sprite-mode"][value="new"]').checked = true;
             saveAssetSelect.hidden = true;
             saveNewAssetName.hidden = false;
+            saveNewAssetCategory.hidden = false;
         }
 
         saveModal.hidden = false;
@@ -284,6 +288,7 @@
             const mode = document.querySelector('input[name="save-lib-sprite-mode"]:checked').value;
             saveAssetSelect.hidden = mode !== 'existing';
             saveNewAssetName.hidden = mode !== 'new';
+            saveNewAssetCategory.hidden = mode !== 'new';
         });
     });
 
@@ -318,7 +323,7 @@
                 const resp = await fetch('/api/projects/default/assets', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: assetName }),
+                    body: JSON.stringify({ name: assetName, category: saveNewAssetCategory.value }),
                 });
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.error);

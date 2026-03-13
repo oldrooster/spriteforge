@@ -8,6 +8,7 @@ const state = {
     animationDelay: 100,
     currentAssetId: null,
     currentRoute: null,
+    pendingToolView: null,
 };
 
 // ── Hash Router ──

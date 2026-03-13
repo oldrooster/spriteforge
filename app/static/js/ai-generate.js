@@ -389,6 +389,34 @@
         });
     });
 
+    // Edit in Markup - opens markup tool with current image, returns edited version as reference
+    const markupBtn = document.getElementById('ai-generate-markup-btn');
+    if (markupBtn) {
+        markupBtn.addEventListener('click', async function () {
+            if (!currentImageUrl) return;
+            // Navigate to markup tool and load the image
+            if (typeof window.markupTool === 'undefined') {
+                showError('Markup tool not available');
+                return;
+            }
+            // Set a callback so markup can return the edited image
+            window.markupReturnToAiGenerate = async function (blob) {
+                // Use the edited image as the reference image for next generation
+                referenceBlob = blob;
+                refImg.src = URL.createObjectURL(blob);
+                refPreview.hidden = false;
+                refClearBtn.hidden = false;
+                // Navigate back to AI Generate
+                navigate('#/asset/' + (state.currentAssetId || '') + '/tool/ai-generate');
+            };
+            navigate('#/asset/' + (state.currentAssetId || '') + '/tool/markup');
+            // Wait for panel to activate, then load the image
+            setTimeout(function () {
+                window.markupTool.loadImageFromUrl(currentImageUrl, null);
+            }, 100);
+        });
+    }
+
     // Download
     downloadBtn.addEventListener('click', function () {
         if (!currentImageUrl) return;

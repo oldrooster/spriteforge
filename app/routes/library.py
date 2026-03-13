@@ -638,6 +638,10 @@ def update_view(asset_id, view_id):
                 view['ags_loop'] = int(data['ags_loop'])
             if 'delay' in data:
                 view['delay'] = int(data['delay'])
+            if 'width' in data:
+                view['width'] = int(data['width'])
+            if 'height' in data:
+                view['height'] = int(data['height'])
             _write_json(_asset_path(asset_id), asset)
             _write_json(os.path.join(_view_dir(asset_id, view_id), 'view.json'), view)
             return jsonify(view)

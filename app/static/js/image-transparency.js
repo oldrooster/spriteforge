@@ -570,18 +570,140 @@
         }
     });
 
-    // Phase C: consume pending resource from context menu
+    // ── View mode: frame-by-frame transparency editing ──
+    let viewMode = null; // { asset_id, view_id, view_name, frame_count }
+    let viewFrameIndex = 1; // current frame (1-based)
+
+    // Create frame thumbnail strip for view mode (same style as resize)
+    const viewThumbStrip = document.createElement('div');
+    viewThumbStrip.className = 'resize-file-list';
+    viewThumbStrip.hidden = true;
+    viewThumbStrip.style.marginTop = '8px';
+    // Insert before the canvas area
+    canvasArea.parentNode.insertBefore(viewThumbStrip, canvasArea);
+
+    function buildViewThumbnails() {
+        viewThumbStrip.innerHTML = '';
+        for (let i = 1; i <= viewMode.frame_count; i++) {
+            const idx = i;
+            const frameName = 'frame_' + String(idx).padStart(4, '0') + '.png';
+            const frameUrl = '/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id + '/frames/' + frameName;
+            const div = document.createElement('div');
+            div.className = 'resize-file-item' + (idx === viewFrameIndex ? ' selected' : '');
+            div.addEventListener('click', async () => {
+                await saveCurrentFrameToView();
+                await selectViewFrame(idx);
+            });
+            const thumb = document.createElement('img');
+            thumb.src = frameUrl;
+            thumb.loading = 'lazy';
+            const label = document.createElement('span');
+            label.textContent = idx;
+            div.appendChild(thumb);
+            div.appendChild(label);
+            viewThumbStrip.appendChild(div);
+        }
+    }
+
+    function updateThumbSelection() {
+        viewThumbStrip.querySelectorAll('.resize-file-item').forEach((el, i) => {
+            el.classList.toggle('selected', i + 1 === viewFrameIndex);
+        });
+    }
+
+    async function selectViewFrame(idx) {
+        viewFrameIndex = idx;
+        updateThumbSelection();
+        await loadViewFrame(idx);
+    }
+
+    async function saveCurrentFrameToView() {
+        if (!viewMode || !sessionId) return;
+        try {
+            const tmp = document.createElement('canvas');
+            tmp.width = canvas.width;
+            tmp.height = canvas.height;
+            const tmpCtx = tmp.getContext('2d');
+            if (currentImageData) {
+                tmpCtx.putImageData(currentImageData, 0, 0);
+            } else {
+                tmpCtx.drawImage(originalImage, 0, 0);
+            }
+            const blob = await new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
+            const frameName = 'frame_' + String(viewFrameIndex).padStart(4, '0') + '.png';
+            const formData = new FormData();
+            formData.append('image', blob, frameName);
+            const url = '/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id + '/frames/' + frameName;
+            await fetch(url, { method: 'PUT', body: formData });
+        } catch (err) {
+            console.error('Failed to save frame:', err);
+        }
+    }
+
+    async function loadViewFrame(frameIdx) {
+        const frameName = 'frame_' + String(frameIdx).padStart(4, '0') + '.png';
+        const frameUrl = '/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id + '/frames/' + frameName;
+        try {
+            const resp = await fetch(frameUrl);
+            const blob = await resp.blob();
+            const file = new File([blob], frameName, { type: 'image/png' });
+            viewFrameIndex = frameIdx;
+            updateThumbSelection();
+            // Upload to server for transparency session
+            const formData = new FormData();
+            formData.append('image', file);
+            const upResp = await fetch('/api/upload-image', { method: 'POST', body: formData });
+            const data = await upResp.json();
+            if (!upResp.ok) throw new Error(data.error);
+            sessionId = data.session_id;
+            loadImage(data.frame_url);
+        } catch (err) {
+            alert('Failed to load frame: ' + err.message);
+        }
+    }
+
+    // Prev/next removed — thumbnails are used instead
+
+    // Phase C: consume pending view or resource from context menu
     const transToolPanel = document.getElementById('tool-make-transparent');
     if (transToolPanel) {
         new MutationObserver(async () => {
-            if (transToolPanel.classList.contains('active') && state.pendingToolResource) {
+            if (!transToolPanel.classList.contains('active')) return;
+
+            // View mode: frame-by-frame
+            if (state.pendingToolView) {
+                const pending = state.pendingToolView;
+                state.pendingToolView = null;
+                viewMode = pending;
+                viewFrameIndex = 1;
+
+                // Show frame thumbnails, hide save-to-library and download
+                viewThumbStrip.hidden = false;
+                downloadBtn.hidden = true;
+                if (saveToLibraryBtn) saveToLibraryBtn.hidden = true;
+                buildViewThumbnails();
+
+                await loadViewFrame(1);
+                return;
+            }
+
+            // Resource mode
+            if (state.pendingToolResource) {
                 const pending = state.pendingToolResource;
                 state.pendingToolResource = null;
+                viewMode = null;
+                viewThumbStrip.hidden = true;
+                downloadBtn.hidden = false;
                 try {
                     const resp = await fetch(pending.resource_url);
                     const blob = await resp.blob();
                     const file = new File([blob], pending.filename, { type: blob.type || 'image/png' });
-                    librarySource = null;
+                    librarySource = {
+                        asset_id: pending.asset_id,
+                        resource_id: pending.resource_id,
+                        filename: pending.filename,
+                        source_type: 'resource',
+                    };
                     uploadImage(file);
                 } catch (err) {
                     alert('Failed to load resource: ' + err.message);
@@ -609,8 +731,14 @@
                 }
                 const blob = await new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
                 const formData = new FormData();
-                formData.append('image', blob, librarySource.filename);
-                const url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
+                var url;
+                if (librarySource.source_type === 'resource') {
+                    formData.append('file', blob, librarySource.filename);
+                    url = '/api/assets/' + librarySource.asset_id + '/resources/' + librarySource.resource_id + '/file';
+                } else {
+                    formData.append('image', blob, librarySource.filename);
+                    url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
+                }
                 const resp = await fetch(url, { method: 'PUT', body: formData });
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.error || 'Save failed');

@@ -337,22 +337,36 @@ def animate():
     model_name = data.get('model', default_model)
     asset_id = data.get('asset_id')
     view_id = data.get('view_id')
+    resource_id = data.get('resource_id')
     frame_index = data.get('frame_index', 1)
     duration = int(data.get('duration', 4))
     generate_audio = bool(data.get('generate_audio', False))
 
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
-    if not asset_id or not view_id:
-        return jsonify({'error': 'asset_id and view_id are required'}), 400
+    if not asset_id:
+        return jsonify({'error': 'asset_id is required'}), 400
+    if not view_id and not resource_id:
+        return jsonify({'error': 'view_id or resource_id is required'}), 400
 
     # Find the source image in the library
     lib_root = current_app.config['LIBRARY_FOLDER']
-    frame_name = f'frame_{int(frame_index):04d}.png'
-    image_path = os.path.join(lib_root, 'assets', asset_id, 'views', view_id, frame_name)
+    if resource_id and not view_id:
+        # Source is a resource file (launched from resource context menu)
+        import json
+        asset_path = os.path.join(lib_root, 'assets', asset_id, 'asset.json')
+        with open(asset_path) as f:
+            asset_data = json.load(f)
+        res = next((r for r in asset_data.get('resources', []) if r['id'] == resource_id), None)
+        if not res:
+            return jsonify({'error': 'Resource not found'}), 404
+        image_path = os.path.join(lib_root, 'assets', asset_id, 'resources', res['filename'])
+    else:
+        frame_name = f'frame_{int(frame_index):04d}.png'
+        image_path = os.path.join(lib_root, 'assets', asset_id, 'views', view_id, frame_name)
 
     if not os.path.exists(image_path):
-        return jsonify({'error': f'Source frame not found: {frame_name}'}), 404
+        return jsonify({'error': f'Source image not found'}), 404
 
     session_id = str(uuid.uuid4())
     session_dir = _session_dir(current_app.config['OUTPUT_FOLDER'], session_id)

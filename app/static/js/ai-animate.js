@@ -44,6 +44,7 @@
                 selectedSprite = {
                     asset_id: pending.asset_id,
                     asset_name: pending.filename,
+                    resource_id: pending.resource_id,
                     view_id: null,
                     view_name: pending.filename,
                     frame_index: 1,
@@ -258,6 +259,7 @@
                     duration: parseInt(document.getElementById('ai-animate-duration').value, 10),
                     asset_id: selectedSprite.asset_id,
                     view_id: selectedSprite.view_id,
+                    resource_id: selectedSprite.resource_id || null,
                     frame_index: selectedSprite.frame_index,
                     generate_audio: document.getElementById('ai-animate-audio').checked,
                 }),

@@ -538,8 +538,14 @@
             var imgResp = await fetch('/api/crop-preview/' + sessionId);
             var blob = await imgResp.blob();
             var formData = new FormData();
-            formData.append('image', blob, librarySource.filename);
-            var url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
+            var url;
+            if (librarySource.source_type === 'resource') {
+                formData.append('file', blob, librarySource.filename);
+                url = '/api/assets/' + librarySource.asset_id + '/resources/' + librarySource.resource_id + '/file';
+            } else {
+                formData.append('image', blob, librarySource.filename);
+                url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
+            }
             var resp = await fetch(url, { method: 'PUT', body: formData });
             var data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Save failed');
@@ -551,18 +557,146 @@
         }
     });
 
-    // Phase C: consume pending resource from context menu
+    // ── View mode: crop all frames ──
+    var viewMode = null; // { asset_id, view_id, view_name, frame_count }
+    var viewSelectedFrame = 1; // 1-based
+
+    // Create frame thumbnail strip for view mode
+    var viewThumbStrip = document.createElement('div');
+    viewThumbStrip.className = 'resize-file-list';
+    viewThumbStrip.hidden = true;
+    viewThumbStrip.style.marginTop = '8px';
+    // Insert before the canvas area
+    canvasArea.parentNode.insertBefore(viewThumbStrip, canvasArea);
+
+    var viewCropBtn = document.createElement('button');
+    viewCropBtn.className = 'btn btn-primary';
+    viewCropBtn.textContent = 'Crop All Frames';
+    viewCropBtn.hidden = true;
+    viewCropBtn.style.marginTop = '8px';
+    // Insert after the download button
+    downloadBtn.parentNode.insertBefore(viewCropBtn, downloadBtn.nextSibling);
+
+    var viewStatusEl = document.createElement('div');
+    viewStatusEl.className = 'view-crop-status hint';
+    viewStatusEl.hidden = true;
+    viewCropBtn.parentNode.insertBefore(viewStatusEl, viewCropBtn.nextSibling);
+
+    function buildViewThumbnails() {
+        viewThumbStrip.innerHTML = '';
+        for (var i = 1; i <= viewMode.frame_count; i++) {
+            (function (idx) {
+                var frameName = 'frame_' + String(idx).padStart(4, '0') + '.png';
+                var frameUrl = '/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id + '/frames/' + frameName;
+                var div = document.createElement('div');
+                div.className = 'resize-file-item' + (idx === viewSelectedFrame ? ' selected' : '');
+                div.addEventListener('click', function () { selectViewFrame(idx); });
+                var thumb = document.createElement('img');
+                thumb.src = frameUrl;
+                thumb.loading = 'lazy';
+                var label = document.createElement('span');
+                label.textContent = idx;
+                div.appendChild(thumb);
+                div.appendChild(label);
+                viewThumbStrip.appendChild(div);
+            })(i);
+        }
+    }
+
+    function selectViewFrame(idx) {
+        viewSelectedFrame = idx;
+        var frameName = 'frame_' + String(idx).padStart(4, '0') + '.png';
+        var frameUrl = '/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id + '/frames/' + frameName;
+        // Update thumbnail selection
+        viewThumbStrip.querySelectorAll('.resize-file-item').forEach(function (el, i) {
+            el.classList.toggle('selected', i + 1 === idx);
+        });
+        // Load this frame into the crop editor
+        fetch(frameUrl)
+            .then(function (resp) { return resp.blob(); })
+            .then(function (blob) {
+                var file = new File([blob], frameName, { type: 'image/png' });
+                librarySource = null;
+                loadFile(file);
+            })
+            .catch(function (err) { alert('Failed to load frame: ' + err.message); });
+    }
+
+    viewCropBtn.addEventListener('click', async function () {
+        if (!viewMode || !sourceImage) return;
+
+        viewCropBtn.disabled = true;
+        viewStatusEl.hidden = false;
+        viewStatusEl.textContent = 'Cropping ' + viewMode.frame_count + ' frames...';
+
+        try {
+            var resp = await fetch('/api/crop-view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    asset_id: viewMode.asset_id,
+                    view_id: viewMode.view_id,
+                    x: Math.round(cropX),
+                    y: Math.round(cropY),
+                    w: Math.round(cropW),
+                    h: Math.round(cropH),
+                }),
+            });
+            var data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'Crop failed');
+            viewStatusEl.textContent = 'Cropped ' + data.cropped + ' frames to ' + data.width + 'x' + data.height;
+        } catch (err) {
+            viewStatusEl.textContent = 'Error: ' + err.message;
+        } finally {
+            viewCropBtn.disabled = false;
+        }
+    });
+
+    // Phase C: consume pending resource or view from context menu
     const cropToolPanel = document.getElementById('tool-crop-image');
     if (cropToolPanel) {
         new MutationObserver(async function () {
-            if (cropToolPanel.classList.contains('active') && state.pendingToolResource) {
-                var pending = state.pendingToolResource;
+            if (!cropToolPanel.classList.contains('active')) return;
+
+            // View mode: crop all frames
+            if (state.pendingToolView) {
+                var pending = state.pendingToolView;
+                state.pendingToolView = null;
+                viewMode = pending;
+                viewSelectedFrame = 1;
+
+                // Show frame thumbnails, view crop controls, hide regular save/download
+                downloadBtn.hidden = true;
+                saveLibraryBtn.hidden = true;
+                viewCropBtn.hidden = false;
+                viewThumbStrip.hidden = false;
+                buildViewThumbnails();
+                imageInfo.textContent = pending.view_name + ' (' + pending.frame_count + ' frames, ' + pending.width + 'x' + pending.height + ')';
+
+                // Load first frame for visual crop selection
+                selectViewFrame(1);
+                return;
+            }
+
+            // Resource mode
+            if (state.pendingToolResource) {
+                var pendingRes = state.pendingToolResource;
                 state.pendingToolResource = null;
+                viewMode = null;
+                viewCropBtn.hidden = true;
+                viewStatusEl.hidden = true;
+                viewThumbStrip.hidden = true;
+                downloadBtn.hidden = false;
                 try {
-                    var resp = await fetch(pending.resource_url);
+                    var resp = await fetch(pendingRes.resource_url);
                     var blob = await resp.blob();
-                    var file = new File([blob], pending.filename, { type: blob.type || 'image/png' });
-                    librarySource = null;
+                    var file = new File([blob], pendingRes.filename, { type: blob.type || 'image/png' });
+                    librarySource = {
+                        asset_id: pendingRes.asset_id,
+                        resource_id: pendingRes.resource_id,
+                        filename: pendingRes.filename,
+                        source_type: 'resource',
+                    };
                     loadFile(file);
                 } catch (err) {
                     alert('Failed to load resource: ' + err.message);

@@ -4,6 +4,8 @@ import uuid
 from flask import Blueprint, current_app, jsonify, request, send_from_directory
 from PIL import Image
 
+from .library import _read_json, _write_json, _asset_path, _view_dir, _generate_thumbnail
+
 crop_bp = Blueprint('crop', __name__)
 
 
@@ -61,3 +63,65 @@ def crop_preview(session_id):
     if not os.path.isdir(output_dir):
         return jsonify({'error': 'Session not found'}), 404
     return send_from_directory(output_dir, 'cropped.png')
+
+
+@crop_bp.route('/crop-view', methods=['POST'])
+def crop_view():
+    """Crop all frames in a view to the same region."""
+    data = request.get_json(silent=True) or {}
+    asset_id = data.get('asset_id')
+    view_id = data.get('view_id')
+    x = int(data.get('x', 0))
+    y = int(data.get('y', 0))
+    w = int(data.get('w', 0))
+    h = int(data.get('h', 0))
+
+    if not asset_id or not view_id:
+        return jsonify({'error': 'asset_id and view_id required'}), 400
+    if w <= 0 or h <= 0:
+        return jsonify({'error': 'Invalid crop dimensions'}), 400
+
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+
+    view = None
+    for v in asset.get('views', []):
+        if v['id'] == view_id:
+            view = v
+            break
+    if not view:
+        return jsonify({'error': 'View not found'}), 404
+
+    view_d = _view_dir(asset_id, view_id)
+    if not os.path.isdir(view_d):
+        return jsonify({'error': 'View directory not found'}), 404
+
+    cropped_count = 0
+    for i in range(1, view['frame_count'] + 1):
+        frame_name = f'frame_{str(i).zfill(4)}.png'
+        frame_path = os.path.join(view_d, frame_name)
+        if not os.path.exists(frame_path):
+            continue
+
+        img = Image.open(frame_path)
+        if img.mode not in ('RGBA', 'RGB'):
+            img = img.convert('RGBA')
+
+        cx = max(0, min(x, img.width - 1))
+        cy = max(0, min(y, img.height - 1))
+        cw = min(w, img.width - cx)
+        ch = min(h, img.height - cy)
+
+        cropped = img.crop((cx, cy, cx + cw, cy + ch))
+        cropped.save(frame_path, 'PNG')
+        cropped_count += 1
+
+    # Update view metadata
+    view['width'] = w
+    view['height'] = h
+    _write_json(_asset_path(asset_id), asset)
+    _write_json(os.path.join(view_d, 'view.json'), view)
+    _generate_thumbnail(asset_id)
+
+    return jsonify({'ok': True, 'cropped': cropped_count, 'width': w, 'height': h})

@@ -5,6 +5,7 @@
     let asset = null;
     let previewTimers = {};  // viewId → timer id
     let activeContextMenu = null; // currently open context menu element
+    let activeFilter = 'all'; // resource filter: all, image, video, audio, other
 
     // ── Load asset on panel activation ──
 
@@ -82,17 +83,54 @@
         header.appendChild(headerActions);
         content.appendChild(header);
 
-        // ── Resource Strip ──
-        const strip = el('div', 'resource-strip');
+        // ── Resource Filter Tabs ──
         const resources = asset.resources || [];
         const thumbResId = asset.thumbnail_resource_id || null;
 
         if (resources.length > 0) {
-            resources.forEach(r => {
+            const filterBar = el('div', 'resource-filter-bar');
+            const types = ['all', 'image', 'video', 'audio', 'other'];
+            types.forEach(t => {
+                const count = t === 'all' ? resources.length
+                    : t === 'other' ? resources.filter(r => r.type !== 'image' && r.type !== 'video' && r.type !== 'audio').length
+                    : resources.filter(r => r.type === t).length;
+                if (t !== 'all' && count === 0) return; // hide empty filters
+                const fBtn = btn(t.charAt(0).toUpperCase() + t.slice(1) + ' (' + count + ')',
+                    'btn btn-secondary btn-small resource-filter-btn' + (activeFilter === t ? ' active' : ''),
+                    () => {
+                        activeFilter = t;
+                        render();
+                    });
+                filterBar.appendChild(fBtn);
+            });
+            content.appendChild(filterBar);
+        }
+
+        // ── Resource Strip ──
+        const strip = el('div', 'resource-strip');
+
+        if (resources.length > 0) {
+            // Sort so hero/default image appears first
+            const sorted = [...resources].sort((a, b) => {
+                if (a.id === thumbResId) return -1;
+                if (b.id === thumbResId) return 1;
+                return 0;
+            });
+            // Filter by active filter
+            const filtered = activeFilter === 'all' ? sorted
+                : activeFilter === 'other' ? sorted.filter(r => r.type !== 'image' && r.type !== 'video' && r.type !== 'audio')
+                : sorted.filter(r => r.type === activeFilter);
+            filtered.forEach(r => {
                 const isDefault = r.id === thumbResId;
                 const card = buildResourceCard(r, isDefault);
                 strip.appendChild(card);
             });
+            if (filtered.length === 0) {
+                const empty = el('p', 'hint');
+                empty.textContent = 'No ' + activeFilter + ' resources.';
+                empty.style.padding = '16px';
+                strip.appendChild(empty);
+            }
         } else {
             // Show hero thumbnail as a placeholder when no resources exist
             const heroCard = el('div', 'resource-card resource-card-hero');
@@ -109,27 +147,6 @@
         }
 
         content.appendChild(strip);
-
-        // ── Tool Buttons ──
-        const toolsSection = el('div', 'asset-detail-section');
-        toolsSection.appendChild(sectionTitle('Tools'));
-        const toolGrid = el('div', 'tool-btn-grid');
-
-        const tools = [
-            ['AI Generate', 'ai-generate'],
-            ['AI Animate', 'ai-animate'],
-            ['Crop', 'crop-image'],
-            ['Resize', 'resize-images'],
-            ['Make Transparent', 'make-transparent'],
-            ['Video to Frames', 'video-to-frames'],
-        ];
-        tools.forEach(([label, route]) => {
-            toolGrid.appendChild(btn(label, 'btn btn-secondary btn-small', () => {
-                navigate('#/asset/' + id + '/tool/' + route);
-            }));
-        });
-        toolsSection.appendChild(toolGrid);
-        content.appendChild(toolsSection);
 
         // ── Views Section ──
         const viewsSection = el('div', 'asset-detail-section');
@@ -148,13 +165,7 @@
         viewsSection.appendChild(newViewBtn);
         content.appendChild(viewsSection);
 
-        // ── Videos Section ──
-        if (asset.videos && asset.videos.length > 0) {
-            const vidSection = el('div', 'asset-detail-section');
-            vidSection.appendChild(sectionTitle('Videos'));
-            asset.videos.forEach(v => vidSection.appendChild(renderVideo(v)));
-            content.appendChild(vidSection);
-        }
+        // Videos are now shown as resources in the resource strip
     }
 
     // ── Build a resource card ──
@@ -162,32 +173,43 @@
     function buildResourceCard(res, isDefault) {
         const card = el('div', 'resource-card' + (isDefault ? ' resource-card-default' : ''));
 
+        // Determine display type (image, video, audio, or other)
+        const displayType = (res.type === 'image' || res.type === 'video' || res.type === 'audio') ? res.type : 'other';
+
         // Preview area
         const preview = el('div', 'resource-card-preview');
         const fileUrl = '/api/assets/' + asset.id + '/resources/' + res.id + '/file';
 
-        if (res.type === 'image') {
+        if (displayType === 'image') {
             const img = document.createElement('img');
             img.src = fileUrl;
             img.alt = res.filename;
             img.loading = 'lazy';
             preview.appendChild(img);
-        } else if (res.type === 'video') {
+        } else if (displayType === 'video') {
             const vid = document.createElement('video');
             vid.src = fileUrl;
             vid.muted = true;
             vid.preload = 'metadata';
             preview.appendChild(vid);
-        } else {
-            // audio — show waveform icon placeholder
+        } else if (displayType === 'audio') {
             const icon = el('div', 'resource-audio-icon');
             icon.innerHTML = '&#9835;';
             preview.appendChild(icon);
+        } else {
+            // 'other' — show file icon placeholder
+            const icon = el('div', 'resource-audio-icon');
+            icon.innerHTML = '&#128196;';
+            preview.appendChild(icon);
         }
+
+        // Click on card to show preview modal
+        preview.style.cursor = 'pointer';
+        preview.addEventListener('click', () => showResourcePreview(res, fileUrl));
 
         // Type badge overlay
         const badge = el('span', 'resource-card-badge');
-        badge.textContent = res.type.toUpperCase();
+        badge.textContent = (displayType === 'other' ? 'OTHER' : res.type.toUpperCase());
         preview.appendChild(badge);
 
         // Default star indicator
@@ -217,6 +239,67 @@
         card.appendChild(nameLabel);
 
         return card;
+    }
+
+    // ── Resource Preview Modal ──
+
+    function showResourcePreview(res, fileUrl) {
+        const displayType = (res.type === 'image' || res.type === 'video' || res.type === 'audio') ? res.type : 'other';
+
+        // Create overlay
+        const overlay = el('div', 'resource-preview-overlay');
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.remove();
+        });
+
+        const box = el('div', 'resource-preview-box');
+
+        const closeBtn = btn('\u2715', 'btn btn-secondary btn-small resource-preview-close', () => overlay.remove());
+        box.appendChild(closeBtn);
+
+        if (displayType === 'image') {
+            const img = document.createElement('img');
+            img.src = fileUrl;
+            img.alt = res.filename;
+            box.appendChild(img);
+        } else if (displayType === 'video') {
+            const vid = document.createElement('video');
+            vid.src = fileUrl;
+            vid.controls = true;
+            vid.autoplay = true;
+            vid.loop = true;
+            vid.style.maxWidth = '100%';
+            vid.style.maxHeight = '70vh';
+            box.appendChild(vid);
+        } else if (displayType === 'audio') {
+            const aud = document.createElement('audio');
+            aud.src = fileUrl;
+            aud.controls = true;
+            aud.autoplay = true;
+            aud.style.width = '100%';
+            box.appendChild(aud);
+        } else {
+            const msg = el('p', 'hint');
+            msg.textContent = 'Preview not available for this file type.';
+            msg.style.padding = '24px';
+            box.appendChild(msg);
+        }
+
+        const nameLabel = el('div', 'resource-preview-name');
+        nameLabel.textContent = res.filename;
+        box.appendChild(nameLabel);
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        // Close on escape
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                overlay.remove();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
     }
 
     // ── Context Menu ──
@@ -284,6 +367,18 @@
 
     // ── Context menu actions ──
 
+    function launchViewTool(view, toolRoute) {
+        state.pendingToolView = {
+            asset_id: asset.id,
+            view_id: view.id,
+            view_name: view.name,
+            frame_count: view.frame_count,
+            width: view.width,
+            height: view.height,
+        };
+        navigate('#/asset/' + asset.id + '/tool/' + toolRoute);
+    }
+
     function launchTool(res, toolRoute) {
         state.pendingToolResource = {
             asset_id: asset.id,
@@ -348,6 +443,9 @@
 
         const actions = el('div', 'view-item-actions');
         actions.appendChild(btn('Preview', 'btn btn-secondary btn-small', () => togglePreview(view, item)));
+        actions.appendChild(btn('Crop', 'btn btn-secondary btn-small', () => launchViewTool(view, 'crop-image')));
+        actions.appendChild(btn('Resize', 'btn btn-secondary btn-small', () => launchViewTool(view, 'resize-images')));
+        actions.appendChild(btn('Transparent', 'btn btn-secondary btn-small', () => launchViewTool(view, 'make-transparent')));
         actions.appendChild(btn('Rename', 'btn btn-secondary btn-small', () => renameView(view)));
         actions.appendChild(btn('Export', 'btn btn-secondary btn-small', () => {
             window.open('/api/assets/' + id + '/views/' + view.id + '/download', '_blank');
