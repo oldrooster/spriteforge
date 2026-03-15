@@ -25,6 +25,9 @@ def _is_vertex():
 
 
 
+VERTEX_GLOBAL_MODELS = {'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'}
+
+
 def _get_client(model_name=None):
     from google import genai
 
@@ -34,7 +37,9 @@ def _get_client(model_name=None):
     api_key = os.environ.get('GEMINI_API_KEY', '').strip()
 
     if gcp_project:
-        client = genai.Client(vertexai=True, project=gcp_project, location=gcp_location)
+        # Preview models are only available via the global endpoint
+        location = 'global' if model_name in VERTEX_GLOBAL_MODELS else gcp_location
+        client = genai.Client(vertexai=True, project=gcp_project, location=location)
         return client, None
 
     if api_key:
