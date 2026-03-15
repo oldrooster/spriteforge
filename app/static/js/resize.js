@@ -15,8 +15,6 @@
     const flipHCheckbox = document.getElementById('resize-flip-h');
     const flipVCheckbox = document.getElementById('resize-flip-v');
     const resizeProgress = document.getElementById('resize-progress');
-    const downloadBtn = document.getElementById('resize-download-btn');
-    const resizeSaveLibraryBtn = document.getElementById('resize-save-library-btn');
     const previewArea = document.getElementById('resize-preview');
     const previewOrigCanvas = document.getElementById('resize-preview-original');
     const previewResultCanvas = document.getElementById('resize-preview-result');
@@ -305,8 +303,6 @@
         formData.append('flip_v', flipVCheckbox.checked);
 
         resizeProgress.hidden = false;
-        downloadBtn.disabled = true;
-        resizeSaveLibraryBtn.disabled = true;
 
         try {
             const resp = await fetch('/api/resize', {
@@ -322,63 +318,9 @@
             return null;
         } finally {
             resizeProgress.hidden = true;
-            downloadBtn.disabled = false;
-            resizeSaveLibraryBtn.disabled = false;
         }
     }
 
-    downloadBtn.addEventListener('click', async () => {
-        const result = await doResize();
-        if (!result) return;
-
-        if (result.count === 1) {
-            // Single image: download as PNG directly
-            window.location.href = `/api/download-resized/${result.sessionId}?format=single`;
-        } else {
-            // Multiple images: download as ZIP
-            window.location.href = `/api/download-resized/${result.sessionId}`;
-        }
-    });
-
-    // ── Save to library ──
-    resizeSaveLibraryBtn.addEventListener('click', async () => {
-        if (!librarySource) return;
-        const result = await doResize();
-        if (!result) return;
-
-        resizeSaveLibraryBtn.disabled = true;
-        try {
-            if (librarySource.source_type === 'resource') {
-                // For resources, download the resized file and PUT back
-                var dlResp = await fetch('/api/download-resized/' + result.sessionId + '?format=single');
-                var blob = await dlResp.blob();
-                var formData = new FormData();
-                formData.append('file', blob, librarySource.filename);
-                var url = '/api/assets/' + librarySource.asset_id + '/resources/' + librarySource.resource_id + '/file';
-                var resp = await fetch(url, { method: 'PUT', body: formData });
-                var data = await resp.json();
-                if (!resp.ok) throw new Error(data.error || 'Save failed');
-                alert('Saved to sprite library!');
-            } else {
-                const resp = await fetch('/api/save-resized-to-library', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: result.sessionId,
-                        asset_id: librarySource.asset_id,
-                        frames: librarySource.frames,
-                    }),
-                });
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.error || 'Save failed');
-                alert('Saved ' + data.count + ' frame(s) to sprite library!');
-            }
-        } catch (err) {
-            alert('Failed to save: ' + err.message);
-        } finally {
-            resizeSaveLibraryBtn.disabled = false;
-        }
-    });
 
     // ── Back to upload (choose different images) ──
     // Reuse the panel back bar for navigation; add a "change images" button via fileListEl
@@ -413,79 +355,131 @@
     // ── View mode: resize all frames and save back ──
     let viewMode = null;
 
-    const viewSaveBtn = document.createElement('button');
-    viewSaveBtn.className = 'btn btn-primary';
-    viewSaveBtn.textContent = 'Resize & Save All Frames';
-    viewSaveBtn.hidden = true;
-    viewSaveBtn.style.marginTop = '8px';
-    downloadBtn.parentNode.insertBefore(viewSaveBtn, downloadBtn.nextSibling);
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'btn btn-primary';
+    applyBtn.textContent = 'Apply Changes';
+    applyBtn.hidden = true;
+    applyBtn.style.marginTop = '8px';
+    const actionBtns = document.querySelector('#tool-resize-images .resize-action-btns');
+    actionBtns.appendChild(applyBtn);
 
-    const viewStatusEl = document.createElement('div');
-    viewStatusEl.className = 'view-resize-status hint';
-    viewStatusEl.hidden = true;
-    viewSaveBtn.parentNode.insertBefore(viewStatusEl, viewSaveBtn.nextSibling);
+    const applyStatusEl = document.createElement('div');
+    applyStatusEl.className = 'view-resize-status hint';
+    applyStatusEl.hidden = true;
+    actionBtns.appendChild(applyStatusEl);
 
-    viewSaveBtn.addEventListener('click', async () => {
-        if (!viewMode || files.length === 0) return;
+    applyBtn.addEventListener('click', async () => {
+        if (files.length === 0) return;
 
-        viewSaveBtn.disabled = true;
-        viewStatusEl.hidden = false;
-        viewStatusEl.textContent = 'Resizing ' + viewMode.frame_count + ' frames...';
+        applyBtn.disabled = true;
+        applyStatusEl.hidden = false;
 
-        const result = await doResize();
-        if (!result) {
-            viewSaveBtn.disabled = false;
-            viewStatusEl.textContent = 'Resize failed';
-            return;
-        }
+        if (viewMode) {
+            // View mode: resize all frames and save back
+            applyStatusEl.textContent = 'Resizing ' + viewMode.frame_count + ' frames...';
 
-        viewStatusEl.textContent = 'Saving frames back to library...';
-        try {
-            // Download each resized frame and PUT back
-            for (let i = 0; i < viewMode.frame_count; i++) {
-                const frameName = 'frame_' + String(i + 1).padStart(4, '0') + '.png';
-                const dlResp = await fetch('/api/download-resized/' + result.sessionId + '?format=single&index=' + i);
-                const blob = await dlResp.blob();
-                const formData = new FormData();
-                formData.append('image', blob, frameName);
-                const url = '/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id + '/frames/' + frameName;
-                const resp = await fetch(url, { method: 'PUT', body: formData });
-                if (!resp.ok) {
-                    const data = await resp.json();
-                    throw new Error(data.error || 'Failed to save frame ' + (i + 1));
+            const result = await doResize();
+            if (!result) {
+                applyBtn.disabled = false;
+                applyStatusEl.textContent = 'Resize failed';
+                return;
+            }
+
+            applyStatusEl.textContent = 'Saving frames back to library...';
+            try {
+                for (let i = 0; i < viewMode.frame_count; i++) {
+                    const frameName = 'frame_' + String(i + 1).padStart(4, '0') + '.png';
+                    const dlResp = await fetch('/api/download-resized/' + result.sessionId + '?format=single&index=' + i);
+                    const blob = await dlResp.blob();
+                    const formData = new FormData();
+                    formData.append('image', blob, frameName);
+                    const url = '/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id + '/frames/' + frameName;
+                    const resp = await fetch(url, { method: 'PUT', body: formData });
+                    if (!resp.ok) {
+                        const data = await resp.json();
+                        throw new Error(data.error || 'Failed to save frame ' + (i + 1));
+                    }
                 }
+
+                const mode = document.querySelector('input[name="resize-mode"]:checked').value;
+                let newW, newH;
+                if (mode === 'percentage') {
+                    const s = parseInt(scaleSlider.value) / 100;
+                    newW = Math.max(1, Math.round(viewMode.width * s));
+                    newH = Math.max(1, Math.round(viewMode.height * s));
+                } else {
+                    newW = parseInt(widthInput.value) || 1;
+                    newH = parseInt(heightInput.value) || 1;
+                }
+                await fetch('/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ width: newW, height: newH }),
+                });
+
+                navigateBack();
+            } catch (err) {
+                applyStatusEl.textContent = 'Error: ' + err.message;
+                applyBtn.disabled = false;
+            }
+        } else if (librarySource && librarySource.source_type === 'resource') {
+            // Resource mode: resize and save back
+            applyStatusEl.textContent = 'Resizing...';
+
+            const result = await doResize();
+            if (!result) {
+                applyBtn.disabled = false;
+                applyStatusEl.textContent = 'Resize failed';
+                return;
             }
 
-            // Update view dimensions
-            const mode = document.querySelector('input[name="resize-mode"]:checked').value;
-            let newW, newH;
-            if (mode === 'percentage') {
-                const s = parseInt(scaleSlider.value) / 100;
-                newW = Math.max(1, Math.round(viewMode.width * s));
-                newH = Math.max(1, Math.round(viewMode.height * s));
-            } else {
-                newW = parseInt(widthInput.value) || 1;
-                newH = parseInt(heightInput.value) || 1;
-            }
-            await fetch('/api/assets/' + viewMode.asset_id + '/views/' + viewMode.view_id, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ width: newW, height: newH }),
-            });
+            applyStatusEl.textContent = 'Saving to library...';
+            try {
+                var dlResp = await fetch('/api/download-resized/' + result.sessionId + '?format=single');
+                var blob = await dlResp.blob();
+                var formData = new FormData();
+                formData.append('file', blob, librarySource.filename);
+                var url = '/api/assets/' + librarySource.asset_id + '/resources/' + librarySource.resource_id + '/file';
+                var resp = await fetch(url, { method: 'PUT', body: formData });
+                var data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Save failed');
 
-            viewStatusEl.textContent = 'Resized ' + viewMode.frame_count + ' frames to ' + newW + 'x' + newH;
-        } catch (err) {
-            viewStatusEl.textContent = 'Error: ' + err.message;
-        } finally {
-            viewSaveBtn.disabled = false;
+                navigateBack();
+            } catch (err) {
+                applyStatusEl.textContent = 'Error: ' + err.message;
+                applyBtn.disabled = false;
+            }
         }
     });
+
+    // Reset panel to initial state
+    function resetPanel() {
+        files = [];
+        selectedIndex = 0;
+        selectedImage = null;
+        originalDimensions = null;
+        librarySource = null;
+        viewMode = null;
+        dropzone.style.display = '';
+        fileListEl.hidden = true;
+        fileListEl.innerHTML = '';
+        previewArea.hidden = true;
+        originalInfo.textContent = '';
+        applyBtn.hidden = true;
+        applyBtn.disabled = false;
+        applyStatusEl.hidden = true;
+        applyStatusEl.textContent = '';
+        resizeProgress.hidden = true;
+    }
 
     // Phase C: consume pending view or resource from context menu
     const resizeToolPanel = document.getElementById('tool-resize-images');
     if (resizeToolPanel) {
         new MutationObserver(async () => {
             if (!resizeToolPanel.classList.contains('active')) return;
+
+            // Reset panel state on every activation
+            resetPanel();
 
             // View mode: resize all frames
             if (state.pendingToolView) {
@@ -509,10 +503,7 @@
                 if (newFiles.length > 0) {
                     librarySource = null;
                     handleFiles(newFiles);
-                    // Hide regular buttons, show view mode
-                    downloadBtn.hidden = true;
-                    resizeSaveLibraryBtn.hidden = true;
-                    viewSaveBtn.hidden = false;
+                    applyBtn.hidden = false;
                     originalInfo.textContent = pending.width + ' x ' + pending.height + 'px (' + pending.frame_count + ' frames in ' + pending.view_name + ')';
                 }
                 return;
@@ -523,9 +514,8 @@
                 const pending = state.pendingToolResource;
                 state.pendingToolResource = null;
                 viewMode = null;
-                viewSaveBtn.hidden = true;
-                viewStatusEl.hidden = true;
-                downloadBtn.hidden = false;
+                applyBtn.hidden = true;
+                applyStatusEl.hidden = true;
                 try {
                     const resp = await fetch(pending.resource_url);
                     const blob = await resp.blob();
@@ -537,7 +527,7 @@
                         source_type: 'resource',
                     };
                     handleFiles([file]);
-                    resizeSaveLibraryBtn.hidden = false;
+                    applyBtn.hidden = false;
                 } catch (err) {
                     alert('Failed to load resource: ' + err.message);
                 }
@@ -579,7 +569,7 @@
                                 frames: frameNames,
                             };
                             handleFiles(newFiles);
-                            resizeSaveLibraryBtn.hidden = false;
+                            applyBtn.hidden = false;
                         }
                     },
                 });

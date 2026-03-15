@@ -2008,6 +2008,27 @@ hr {
     margin-left: auto;
 }
 
+.asset-menu-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 16px;
+    line-height: 28px;
+    text-align: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.asset-menu-btn:hover {
+    background: var(--border);
+    color: var(--text-primary);
+}
+
 .asset-detail-hero {
     margin-bottom: 24px;
 }
@@ -2655,6 +2676,10 @@ hr {
     max-height: 70vh;
     image-rendering: pixelated;
     border-radius: 4px;
+}
+
+.resource-preview-box audio {
+    min-width: min(500px, 80vw);
 }
 
 .resource-preview-close {

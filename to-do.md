@@ -1,13 +1,13 @@
+# Bugs / Tidy up
+ * In the Assets:
+   * For the views, the buttons are getting busy, can you instead make this a context menu via ... similar to resources
+   * Same for the asset, add ... next to the asset name and use a context menu for the Rename / Upload / Download / Export AGS / Delete
+
 # Features
-* On Asset view with the top resources, include filters by images, videos, audio, or other
-* In the same asset view, if an image or video is clicked on display a preview of the image / video
-* on assets remove the Videos section at the bottom. This is already taken care of with the top resources section. When AI Ainimate videos are saved, they should appear back in the appropriate asset at the top resource section as a video.
+ * On the assets:
+   * For a new empty asset, instead of a blank image have a "generate" button to generate a new image
+   * on the resources context menu, also add a Generate Image button.
+ * Can you add an AI music generator using Lyria? With the necessary prompt to generate and listen to music. 
+   * Music can be generated from an asset, using the ... context menu next to the asset nameand select Generate Music
 
-* for resources, if its not an image, video, or audio, then display other
-* in assets, remove the Tools section. These are now all launched via the resources in context
-* The layers on markup image is Great!! The Brush tool doesnt add a layer though, can you plese do that?
-
-# Bugs
-* when launching the crop image tool from a view there is no thumbnails shown to see how it applies to other images. Also the make transparent when launched from a view has next and previous buttons, which works, however the user experience is still not great. Can both of these instead use method as resize, this shows thumbnails that can be clicked on. Please unify.
-
-* when selecting an image from the asset resource selection and choosing AI Animate, I enter my prompt click generate and it states 'asset_id and view_id are required'
+   

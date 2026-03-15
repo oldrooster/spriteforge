@@ -26,7 +26,6 @@
     const zoomOutBtn = document.getElementById('img-trans-zoom-out');
     const zoomResetBtn = document.getElementById('img-trans-zoom-reset');
     const zoomDisplay = document.getElementById('img-trans-zoom-display');
-    const downloadBtn = document.getElementById('img-trans-download-btn');
     const bgOptions = document.getElementById('img-trans-bg-options');
     const bgBtns = bgOptions.querySelectorAll('.preview-bg-btn');
     const bgCustom = document.getElementById('img-trans-bg-custom');
@@ -94,7 +93,6 @@
             dropzone.style.display = '';
             canvasArea.hidden = true;
             settingsPanel.style.display = 'none';
-            if (saveToLibraryBtn) saveToLibraryBtn.hidden = true;
             fileInput.value = '';
         });
     }
@@ -158,9 +156,6 @@
             zoomStepIndex = calcFitZoomIndex();
             applyZoom();
             drawFrame();
-
-            // Show/hide save-to-library button
-            if (saveToLibraryBtn) saveToLibraryBtn.hidden = !librarySource;
 
             // Show canvas and settings, hide dropzone
             dropzone.style.display = 'none';
@@ -563,12 +558,6 @@
         img.src = `/api/frames/${sessionId}/original/frame_0001.png?t=` + Date.now();
     });
 
-    // ── Download ──
-    downloadBtn.addEventListener('click', () => {
-        if (sessionId) {
-            window.location.href = `/api/download-image/${sessionId}`;
-        }
-    });
 
     // ── View mode: frame-by-frame transparency editing ──
     let viewMode = null; // { asset_id, view_id, view_name, frame_count }
@@ -664,11 +653,82 @@
 
     // Prev/next removed — thumbnails are used instead
 
+    // ── Apply Changes button (saves back to library and navigates back) ──
+    const applyChangesBtn = document.createElement('button');
+    applyChangesBtn.className = 'btn btn-primary';
+    applyChangesBtn.textContent = 'Apply Changes';
+    applyChangesBtn.hidden = true;
+    applyChangesBtn.style.marginTop = '8px';
+    const actionBtns = document.querySelector('#tool-make-transparent .img-trans-action-btns');
+    actionBtns.appendChild(applyChangesBtn);
+
+    const applyStatusEl = document.createElement('div');
+    applyStatusEl.className = 'view-resize-status hint';
+    applyStatusEl.hidden = true;
+    actionBtns.appendChild(applyStatusEl);
+
+    applyChangesBtn.addEventListener('click', async () => {
+        if (!sessionId) return;
+        applyChangesBtn.disabled = true;
+        applyStatusEl.hidden = false;
+        applyStatusEl.textContent = 'Saving changes...';
+
+        try {
+            // Get current image as blob
+            const tmp = document.createElement('canvas');
+            tmp.width = canvas.width;
+            tmp.height = canvas.height;
+            const tmpCtx = tmp.getContext('2d');
+            if (currentImageData) {
+                tmpCtx.putImageData(currentImageData, 0, 0);
+            } else {
+                tmpCtx.drawImage(originalImage, 0, 0);
+            }
+            const blob = await new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
+
+            if (viewMode) {
+                // Save current frame first
+                await saveCurrentFrameToView();
+                applyStatusEl.textContent = 'Saved all frames.';
+            } else if (librarySource) {
+                const formData = new FormData();
+                if (librarySource.source_type === 'resource') {
+                    formData.append('file', blob, librarySource.filename);
+                    const url = '/api/assets/' + librarySource.asset_id + '/resources/' + librarySource.resource_id + '/file';
+                    const resp = await fetch(url, { method: 'PUT', body: formData });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error(data.error || 'Save failed');
+                } else {
+                    formData.append('image', blob, librarySource.filename);
+                    const url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
+                    const resp = await fetch(url, { method: 'PUT', body: formData });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error(data.error || 'Save failed');
+                }
+                applyStatusEl.textContent = 'Saved.';
+            }
+
+            setTimeout(() => {
+                if (typeof navigateBack === 'function') navigateBack();
+            }, 500);
+        } catch (err) {
+            alert('Failed to save: ' + err.message);
+            applyChangesBtn.disabled = false;
+            applyStatusEl.hidden = true;
+        }
+    });
+
     // Phase C: consume pending view or resource from context menu
     const transToolPanel = document.getElementById('tool-make-transparent');
     if (transToolPanel) {
         new MutationObserver(async () => {
             if (!transToolPanel.classList.contains('active')) return;
+
+            // Reset apply button state
+            applyChangesBtn.disabled = false;
+            applyChangesBtn.hidden = true;
+            applyStatusEl.hidden = true;
+            applyStatusEl.textContent = '';
 
             // View mode: frame-by-frame
             if (state.pendingToolView) {
@@ -677,10 +737,9 @@
                 viewMode = pending;
                 viewFrameIndex = 1;
 
-                // Show frame thumbnails, hide save-to-library and download
+                // Show frame thumbnails
                 viewThumbStrip.hidden = false;
-                downloadBtn.hidden = true;
-                if (saveToLibraryBtn) saveToLibraryBtn.hidden = true;
+                applyChangesBtn.hidden = false;
                 buildViewThumbnails();
 
                 await loadViewFrame(1);
@@ -693,7 +752,7 @@
                 state.pendingToolResource = null;
                 viewMode = null;
                 viewThumbStrip.hidden = true;
-                downloadBtn.hidden = false;
+                applyChangesBtn.hidden = false;
                 try {
                     const resp = await fetch(pending.resource_url);
                     const blob = await resp.blob();
@@ -704,7 +763,7 @@
                         filename: pending.filename,
                         source_type: 'resource',
                     };
-                    uploadImage(file);
+                    uploadImage(file, true);
                 } catch (err) {
                     alert('Failed to load resource: ' + err.message);
                 }
@@ -712,42 +771,4 @@
         }).observe(transToolPanel, { attributes: true, attributeFilter: ['class'] });
     }
 
-    // ── Save back to Sprite Library ──
-    const saveToLibraryBtn = document.getElementById('img-trans-save-library-btn');
-    if (saveToLibraryBtn) {
-        saveToLibraryBtn.addEventListener('click', async () => {
-            if (!librarySource || !sessionId) return;
-            saveToLibraryBtn.disabled = true;
-            try {
-                // Get current image data as blob
-                const tmp = document.createElement('canvas');
-                tmp.width = canvas.width;
-                tmp.height = canvas.height;
-                const tmpCtx = tmp.getContext('2d');
-                if (currentImageData) {
-                    tmpCtx.putImageData(currentImageData, 0, 0);
-                } else {
-                    tmpCtx.drawImage(originalImage, 0, 0);
-                }
-                const blob = await new Promise(resolve => tmp.toBlob(resolve, 'image/png'));
-                const formData = new FormData();
-                var url;
-                if (librarySource.source_type === 'resource') {
-                    formData.append('file', blob, librarySource.filename);
-                    url = '/api/assets/' + librarySource.asset_id + '/resources/' + librarySource.resource_id + '/file';
-                } else {
-                    formData.append('image', blob, librarySource.filename);
-                    url = '/api/assets/' + librarySource.asset_id + '/views/' + librarySource.view_id + '/frames/' + librarySource.filename;
-                }
-                const resp = await fetch(url, { method: 'PUT', body: formData });
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.error || 'Save failed');
-                alert('Saved to sprite library!');
-            } catch (err) {
-                alert('Failed to save: ' + err.message);
-            } finally {
-                saveToLibraryBtn.disabled = false;
-            }
-        });
-    }
 })();

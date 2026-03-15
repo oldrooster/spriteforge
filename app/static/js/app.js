@@ -58,6 +58,7 @@ const toolPanelMap = {
     'make-transparent': 'tool-make-transparent',
     'ai-generate': 'tool-ai-generate',
     'ai-animate': 'tool-ai-animate',
+    'ai-music': 'tool-ai-music',
     'markup': 'tool-markup',
 };
 

@@ -64,23 +64,30 @@
             tagsWrap.appendChild(pill);
         });
 
-        const headerActions = el('div', 'asset-detail-header-actions');
-        headerActions.appendChild(btn('Rename', 'btn btn-secondary btn-small', () => renameAsset()));
-        headerActions.appendChild(btn('Upload', 'btn btn-secondary btn-small', () => uploadResource()));
-        headerActions.appendChild(btn('Download', 'btn btn-secondary btn-small', () => {
-            window.open('/api/assets/' + id + '/download', '_blank');
-        }));
-        headerActions.appendChild(btn('Export AGS', 'btn btn-secondary btn-small', () => {
-            window.open('/api/assets/' + id + '/export-ags', '_blank');
-        }));
-        const delBtn = btn('Delete', 'btn btn-secondary btn-small', () => deleteAsset());
-        delBtn.style.color = 'var(--accent)';
-        headerActions.appendChild(delBtn);
+        const assetMenuBtn = el('button', 'asset-menu-btn');
+        assetMenuBtn.textContent = '\u2026';
+        assetMenuBtn.title = 'Asset Actions';
+        assetMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const items = [
+                ['Rename', () => renameAsset()],
+                ['Upload Resource', () => uploadResource()],
+                null,
+                ['Generate Image', () => navigate('#/asset/' + id + '/tool/ai-generate')],
+                ['Generate Music', () => navigate('#/asset/' + id + '/tool/ai-music')],
+                null,
+                ['Download', () => { window.open('/api/assets/' + id + '/download', '_blank'); }],
+                ['Export AGS', () => { window.open('/api/assets/' + id + '/export-ags', '_blank'); }],
+                null,
+                ['Delete', () => deleteAsset(), true],
+            ];
+            buildContextMenu(items, assetMenuBtn);
+        });
 
         header.appendChild(nameEl);
+        header.appendChild(assetMenuBtn);
         header.appendChild(badge);
         header.appendChild(tagsWrap);
-        header.appendChild(headerActions);
         content.appendChild(header);
 
         // ── Resource Filter Tabs ──
@@ -143,6 +150,11 @@
             const label = el('div', 'resource-card-name');
             label.textContent = asset.name;
             heroCard.appendChild(label);
+            const generateBtn = btn('Generate', 'btn btn-primary btn-small', () => {
+                navigate('#/asset/' + id + '/tool/ai-generate');
+            });
+            generateBtn.style.marginTop = '8px';
+            heroCard.appendChild(generateBtn);
             strip.appendChild(heroCard);
         }
 
@@ -315,30 +327,9 @@
 
     // ── Context Menu ──
 
-    function showContextMenu(res, anchorEl) {
+    function buildContextMenu(items, anchorEl) {
         dismissContextMenu();
-
         const menu = el('div', 'resource-context-menu');
-        const items = [];
-
-        if (res.type === 'image') {
-            items.push(['AI Generate', () => launchTool(res, 'ai-generate')]);
-            items.push(['AI Animate', () => launchTool(res, 'ai-animate')]);
-            items.push(['Crop', () => launchTool(res, 'crop-image')]);
-            items.push(['Resize', () => launchTool(res, 'resize-images')]);
-            items.push(['Make Transparent', () => launchTool(res, 'make-transparent')]);
-            items.push(['Mark Up', () => launchTool(res, 'markup')]);
-            items.push(null); // separator
-            items.push(['Set as Default', () => setAsDefault(res)]);
-        } else if (res.type === 'video') {
-            items.push(['Video to Frames', () => launchTool(res, 'video-to-frames')]);
-            items.push(null);
-        }
-
-        items.push(['Duplicate', () => duplicateResource(res)]);
-        items.push(['Rename', () => renameResource(res)]);
-        items.push(null);
-        items.push(['Delete', () => deleteResource(res), true]);
 
         items.forEach(item => {
             if (item === null) {
@@ -356,24 +347,49 @@
             menu.appendChild(menuItem);
         });
 
-        // Position relative to the anchor button
         const rect = anchorEl.getBoundingClientRect();
         menu.style.position = 'fixed';
         menu.style.top = rect.bottom + 4 + 'px';
         menu.style.left = rect.right + 'px';
         document.body.appendChild(menu);
 
-        // Adjust if off-screen right
         const menuRect = menu.getBoundingClientRect();
         if (menuRect.right > window.innerWidth - 8) {
             menu.style.left = (rect.left - menuRect.width) + 'px';
         }
-        // Adjust if off-screen bottom
         if (menuRect.bottom > window.innerHeight - 8) {
             menu.style.top = (rect.top - menuRect.height) + 'px';
         }
 
         activeContextMenu = menu;
+    }
+
+    function showContextMenu(res, anchorEl) {
+        const items = [];
+
+        if (res.type === 'image') {
+            items.push(['Generate Image', () => launchTool(res, 'ai-generate')]);
+            items.push(['AI Animate', () => launchTool(res, 'ai-animate')]);
+            items.push(['Crop', () => launchTool(res, 'crop-image')]);
+            items.push(['Resize', () => launchTool(res, 'resize-images')]);
+            items.push(['Make Transparent', () => launchTool(res, 'make-transparent')]);
+            items.push(['Mark Up', () => launchTool(res, 'markup')]);
+            items.push(null);
+            items.push(['Set as Default', () => setAsDefault(res)]);
+        } else if (res.type === 'video') {
+            items.push(['Video to Frames', () => launchTool(res, 'video-to-frames')]);
+            items.push(null);
+        }
+
+        items.push(['Duplicate', () => duplicateResource(res)]);
+        items.push(['Rename', () => renameResource(res)]);
+        items.push(['Download', () => {
+            window.open('/api/assets/' + asset.id + '/resources/' + res.id + '/file', '_blank');
+        }]);
+        items.push(null);
+        items.push(['Delete', () => deleteResource(res), true]);
+
+        buildContextMenu(items, anchorEl);
     }
 
     // ── Context menu actions ──
@@ -453,17 +469,26 @@
         info.appendChild(meta);
 
         const actions = el('div', 'view-item-actions');
-        actions.appendChild(btn('Preview', 'btn btn-secondary btn-small', () => togglePreview(view, item)));
-        actions.appendChild(btn('Crop', 'btn btn-secondary btn-small', () => launchViewTool(view, 'crop-image')));
-        actions.appendChild(btn('Resize', 'btn btn-secondary btn-small', () => launchViewTool(view, 'resize-images')));
-        actions.appendChild(btn('Transparent', 'btn btn-secondary btn-small', () => launchViewTool(view, 'make-transparent')));
-        actions.appendChild(btn('Rename', 'btn btn-secondary btn-small', () => renameView(view)));
-        actions.appendChild(btn('Export', 'btn btn-secondary btn-small', () => {
-            window.open('/api/assets/' + id + '/views/' + view.id + '/download', '_blank');
-        }));
-        const delBtn = btn('Delete', 'btn btn-secondary btn-small', () => deleteView(view));
-        delBtn.style.color = 'var(--accent)';
-        actions.appendChild(delBtn);
+        const viewMenuBtn = el('button', 'asset-menu-btn');
+        viewMenuBtn.textContent = '\u2026';
+        viewMenuBtn.title = 'View Actions';
+        viewMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const items = [
+                ['Preview', () => togglePreview(view, item)],
+                null,
+                ['Crop', () => launchViewTool(view, 'crop-image')],
+                ['Resize', () => launchViewTool(view, 'resize-images')],
+                ['Make Transparent', () => launchViewTool(view, 'make-transparent')],
+                null,
+                ['Rename', () => renameView(view)],
+                ['Export', () => { window.open('/api/assets/' + id + '/views/' + view.id + '/download', '_blank'); }],
+                null,
+                ['Delete', () => deleteView(view), true],
+            ];
+            buildContextMenu(items, viewMenuBtn);
+        });
+        actions.appendChild(viewMenuBtn);
 
         hdr.appendChild(info);
         hdr.appendChild(actions);

@@ -12,13 +12,20 @@
     var arrowBtn = document.getElementById('markup-arrow-btn');
     var rectBtn = document.getElementById('markup-rect-btn');
     var ellipseBtn = document.getElementById('markup-ellipse-btn');
-    var allToolBtns = [brushBtn, textBtn, lineBtn, arrowBtn, rectBtn, ellipseBtn];
+    var fillToolBtn = document.getElementById('markup-fill-btn');
+    var allToolBtns = [brushBtn, textBtn, lineBtn, arrowBtn, rectBtn, ellipseBtn, fillToolBtn];
 
     // Settings panels
     var brushSettings = document.getElementById('markup-brush-settings');
+    var fillSettings = document.getElementById('markup-fill-settings');
     var textSettings = document.getElementById('markup-text-settings');
     var shapeSettings = document.getElementById('markup-shape-settings');
     var fillGroup = document.getElementById('markup-fill-group');
+
+    // Fill tool settings
+    var fillToolColor = document.getElementById('markup-fill-tool-color');
+    var fillToleranceSlider = document.getElementById('markup-fill-tolerance-slider');
+    var fillToleranceDisplay = document.getElementById('markup-fill-tolerance-display');
 
     // Brush settings
     var colorPicker = document.getElementById('markup-color');
@@ -141,12 +148,17 @@
         allToolBtns.forEach(function (btn) { btn.classList.remove('active'); });
 
         brushSettings.hidden = true;
+        fillSettings.hidden = true;
         textSettings.hidden = true;
         shapeSettings.hidden = true;
 
         if (tool === 'brush') {
             brushBtn.classList.add('active');
             brushSettings.hidden = false;
+            canvas.style.cursor = 'crosshair';
+        } else if (tool === 'fill') {
+            fillToolBtn.classList.add('active');
+            fillSettings.hidden = false;
             canvas.style.cursor = 'crosshair';
         } else if (tool === 'text') {
             textBtn.classList.add('active');
@@ -168,6 +180,7 @@
     arrowBtn.addEventListener('click', function () { setTool('arrow'); });
     rectBtn.addEventListener('click', function () { setTool('rect'); });
     ellipseBtn.addEventListener('click', function () { setTool('ellipse'); });
+    fillToolBtn.addEventListener('click', function () { setTool('fill'); });
 
     // ── Slider displays ──
     sizeSlider.addEventListener('input', function () {
@@ -182,6 +195,10 @@
         var size = fontSizeSlider.value;
         fontSizeDisplay.textContent = size;
         updateFontPreview();
+    });
+
+    fillToleranceSlider.addEventListener('input', function () {
+        fillToleranceDisplay.textContent = fillToleranceSlider.value;
     });
 
     fontFamilySelect.addEventListener('change', updateFontPreview);
@@ -374,6 +391,11 @@
         if (!originalImage) return;
         var pos = getCanvasPos(e);
 
+        if (activeTool === 'fill') {
+            floodFillAt(pos.x, pos.y);
+            return;
+        }
+
         if (activeTool === 'brush') {
             isDrawing = true;
             lastX = pos.x;
@@ -534,6 +556,86 @@
             dragStart = null;
         }
     });
+
+    // ── Flood fill tool ──
+    function floodFillAt(px, py) {
+        if (!originalImage) return;
+        var x = Math.floor(px);
+        var y = Math.floor(py);
+        var w = canvas.width;
+        var h = canvas.height;
+        if (x < 0 || x >= w || y < 0 || y >= h) return;
+
+        // Read the current composite (original + all layers)
+        var compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = w;
+        compositeCanvas.height = h;
+        var compositeCtx = compositeCanvas.getContext('2d');
+        compositeCtx.drawImage(originalImage, 0, 0);
+        layers.forEach(function (layer) { drawLayer(compositeCtx, layer); });
+        var srcData = compositeCtx.getImageData(0, 0, w, h).data;
+
+        // Target pixel color
+        var startIdx = (y * w + x) * 4;
+        var startR = srcData[startIdx];
+        var startG = srcData[startIdx + 1];
+        var startB = srcData[startIdx + 2];
+        var startA = srcData[startIdx + 3];
+
+        // Fill color
+        var hex = fillToolColor.value;
+        var fR = parseInt(hex.substr(1, 2), 16);
+        var fG = parseInt(hex.substr(3, 2), 16);
+        var fB = parseInt(hex.substr(5, 2), 16);
+
+        // Don't fill if already the same color
+        if (startR === fR && startG === fG && startB === fB && startA === 255) return;
+
+        var tol = parseInt(fillToleranceSlider.value);
+
+        // Create fill result as ImageData
+        var fillCanvas = document.createElement('canvas');
+        fillCanvas.width = w;
+        fillCanvas.height = h;
+        var fillCtx = fillCanvas.getContext('2d');
+        var fillImgData = fillCtx.getImageData(0, 0, w, h);
+        var fillData = fillImgData.data;
+
+        var visited = new Uint8Array(w * h);
+        var stack = [x + y * w];
+        visited[x + y * w] = 1;
+
+        while (stack.length > 0) {
+            var pos = stack.pop();
+            var cx = pos % w;
+            var cy = (pos - cx) / w;
+            var idx = pos * 4;
+
+            var dr = srcData[idx] - startR;
+            var dg = srcData[idx + 1] - startG;
+            var db = srcData[idx + 2] - startB;
+            var da = srcData[idx + 3] - startA;
+            if (Math.sqrt(dr * dr + dg * dg + db * db + da * da) <= tol) {
+                fillData[idx] = fR;
+                fillData[idx + 1] = fG;
+                fillData[idx + 2] = fB;
+                fillData[idx + 3] = 255;
+
+                if (cx > 0 && !visited[pos - 1]) { visited[pos - 1] = 1; stack.push(pos - 1); }
+                if (cx < w - 1 && !visited[pos + 1]) { visited[pos + 1] = 1; stack.push(pos + 1); }
+                if (cy > 0 && !visited[pos - w]) { visited[pos - w] = 1; stack.push(pos - w); }
+                if (cy < h - 1 && !visited[pos + w]) { visited[pos + w] = 1; stack.push(pos + w); }
+            }
+        }
+
+        fillCtx.putImageData(fillImgData, 0, 0);
+        var strokeData = fillCtx.getImageData(0, 0, w, h);
+        layers.push({ type: 'brush', imageData: strokeData });
+        selectedLayerIndex = layers.length - 1;
+        render();
+        renderLayersPanel();
+        pushUndo();
+    }
 
     function buildShapeLayer(x1, y1, x2, y2) {
         var color = shapeColorPicker.value;

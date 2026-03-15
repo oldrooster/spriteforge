@@ -436,8 +436,6 @@
                         </div>
                         <hr>
                         <div class="img-trans-action-btns">
-                            <button id="img-trans-download-btn" class="btn btn-accent">Download</button>
-                            <button id="img-trans-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
                         </div>
                     </div>
                 </div>
@@ -550,8 +548,6 @@
                             <div class="progress-fill indeterminate"></div>
                         </div>
                         <div class="resize-action-btns">
-                            <button id="resize-download-btn" class="btn btn-accent">Download</button>
-                            <button id="resize-save-library-btn" class="btn btn-primary" hidden>Save to Library</button>
                         </div>
                     </div>
                 </div>
@@ -811,6 +807,65 @@
                 </div>
             </div>
 
+            <!-- Tool: AI Music Generator -->
+            <div class="tool-panel" id="tool-ai-music">
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">AI Music Generator</span>
+                </div>
+                <div class="ai-layout">
+                    <div class="ai-preview">
+                        <div id="ai-music-empty" class="dropzone" style="pointer-events:none;">
+                            <div class="dropzone-content">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M9 18V5l12-2v13"/>
+                                    <circle cx="6" cy="18" r="3"/>
+                                    <circle cx="18" cy="16" r="3"/>
+                                </svg>
+                                <p>AI Music Generator</p>
+                                <span class="hint">Describe the music you want to create</span>
+                            </div>
+                        </div>
+                        <div id="ai-music-result" hidden>
+                            <h3>Generated Music</h3>
+                            <audio id="ai-music-audio" controls style="width:100%;margin-top:12px;"></audio>
+                        </div>
+                    </div>
+                    <div class="ai-settings">
+                        <div class="setting-group">
+                            <label>Music Prompt</label>
+                            <textarea id="ai-music-prompt" class="styled-textarea" rows="4"
+                                placeholder="A calm acoustic folk song with gentle guitar melody and soft strings..."></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label>Negative Prompt <span class="hint">(optional)</span></label>
+                            <textarea id="ai-music-negative-prompt" class="styled-textarea" rows="2"
+                                placeholder="vocals, drums, distortion..."></textarea>
+                        </div>
+                        <button id="ai-music-btn" class="btn btn-primary" style="width:100%">Generate Music</button>
+                        <span class="hint" style="margin-top:4px;">Generates ~30 seconds of instrumental audio</span>
+                        <div id="ai-music-progress" class="progress-bar" hidden>
+                            <div class="progress-fill indeterminate"></div>
+                        </div>
+                        <span id="ai-music-status-text" class="hint" hidden>Generating music... this may take a minute</span>
+                        <div id="ai-music-actions" hidden>
+                            <hr>
+                            <div class="setting-group">
+                                <label>Refine</label>
+                                <textarea id="ai-music-refine-prompt" class="styled-textarea" rows="3"
+                                    placeholder="Modify your prompt and regenerate..."></textarea>
+                                <button id="ai-music-refine-btn" class="btn btn-secondary" style="width:100%;margin-top:6px;">Regenerate</button>
+                            </div>
+                            <hr>
+                            <div id="ai-music-history" style="margin-bottom:12px;"></div>
+                            <button id="ai-music-save-btn" class="btn btn-accent" style="width:100%">Save to Library</button>
+                            <button id="ai-music-download-btn" class="btn btn-secondary" style="width:100%; margin-top:8px;">Download Audio</button>
+                        </div>
+                        <div id="ai-music-error" class="ai-error-msg" hidden></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Mark Up Tool -->
             <div class="tool-panel" id="tool-markup">
                 <div class="panel-back-bar">
@@ -843,6 +898,7 @@
                                 <button id="markup-arrow-btn" class="btn btn-secondary btn-small" title="Arrow">Arrow</button>
                                 <button id="markup-rect-btn" class="btn btn-secondary btn-small" title="Rectangle">Rect</button>
                                 <button id="markup-ellipse-btn" class="btn btn-secondary btn-small" title="Ellipse">Ellipse</button>
+                                <button id="markup-fill-btn" class="btn btn-secondary btn-small" title="Fill (paint bucket)">Fill</button>
                             </div>
                         </div>
                         <!-- Brush settings -->
@@ -854,6 +910,17 @@
                             <div class="setting-group">
                                 <label>Brush Size: <span id="markup-size-display">4</span>px</label>
                                 <input type="range" id="markup-size-slider" min="1" max="40" value="4" class="styled-range">
+                            </div>
+                        </div>
+                        <!-- Fill settings -->
+                        <div id="markup-fill-settings" hidden>
+                            <div class="setting-group">
+                                <label>Fill Color</label>
+                                <input type="color" id="markup-fill-tool-color" value="#ff0000">
+                            </div>
+                            <div class="setting-group">
+                                <label>Tolerance: <span id="markup-fill-tolerance-display">30</span></label>
+                                <input type="range" id="markup-fill-tolerance-slider" min="0" max="128" value="30" class="styled-range">
                             </div>
                         </div>
                         <!-- Text settings -->
@@ -1105,6 +1172,7 @@
     <script src="/static/js/crop.js"></script>
     <script src="/static/js/ai-generate.js"></script>
     <script src="/static/js/ai-animate.js"></script>
+    <script src="/static/js/ai-music.js"></script>
     <script src="/static/js/project-settings.js"></script>
     <script src="/static/js/markup.js"></script>
 </body>
