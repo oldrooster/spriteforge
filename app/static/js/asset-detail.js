@@ -139,22 +139,17 @@
                 strip.appendChild(empty);
             }
         } else {
-            // Show hero thumbnail as a placeholder when no resources exist
+            // Show hero card with centered generate button when no resources exist
             const heroCard = el('div', 'resource-card resource-card-hero');
-            const preview = el('div', 'resource-card-preview');
-            const img = document.createElement('img');
-            img.src = '/api/assets/' + id + '/thumbnail?t=' + Date.now();
-            img.alt = asset.name;
-            preview.appendChild(img);
+            const preview = el('div', 'resource-card-preview hero-empty-preview');
+            const generateBtn = btn('Generate Image', 'btn btn-primary', () => {
+                navigate('#/asset/' + id + '/tool/ai-generate');
+            });
+            preview.appendChild(generateBtn);
             heroCard.appendChild(preview);
             const label = el('div', 'resource-card-name');
             label.textContent = asset.name;
             heroCard.appendChild(label);
-            const generateBtn = btn('Generate', 'btn btn-primary btn-small', () => {
-                navigate('#/asset/' + id + '/tool/ai-generate');
-            });
-            generateBtn.style.marginTop = '8px';
-            heroCard.appendChild(generateBtn);
             strip.appendChild(heroCard);
         }
 
@@ -482,6 +477,7 @@
                 ['Make Transparent', () => launchViewTool(view, 'make-transparent')],
                 null,
                 ['Rename', () => renameView(view)],
+                ['Duplicate', () => duplicateView(view)],
                 ['Export', () => { window.open('/api/assets/' + id + '/views/' + view.id + '/download', '_blank'); }],
                 null,
                 ['Delete', () => deleteView(view), true],
@@ -625,6 +621,11 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: name.trim() }),
         });
+        load();
+    }
+
+    async function duplicateView(view) {
+        await fetch('/api/assets/' + asset.id + '/views/' + view.id + '/duplicate', { method: 'POST' });
         load();
     }
 

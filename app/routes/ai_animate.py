@@ -15,8 +15,8 @@ MODELS_AI_STUDIO = [
 ]
 
 MODELS_VERTEX_AI = [
-    {'id': 'veo-3.1-generate-001', 'name': 'Veo 3.1 (Latest) - ~$0.40/sec', 'default': True},
-    {'id': 'veo-3.1-fast-generate-001', 'name': 'Veo 3.1 Fast - ~$0.15/sec', 'default': False},
+    {'id': 'veo-3.1-fast-generate-001', 'name': 'Veo 3.1 Fast - ~$0.15/sec', 'default': True},
+    {'id': 'veo-3.1-generate-001', 'name': 'Veo 3.1 (Latest) - ~$0.40/sec', 'default': False},
     {'id': 'veo-3.1-generate-preview', 'name': 'Veo 3.1 Preview - ~$0.40/sec', 'default': False},
     {'id': 'veo-3.1-fast-generate-preview', 'name': 'Veo 3.1 Fast Preview - ~$0.15/sec', 'default': False},
     {'id': 'veo-3.0-generate-001', 'name': 'Veo 3.0 - ~$0.36/sec', 'default': False},
@@ -338,7 +338,7 @@ def animate():
 
     data = request.get_json(force=True)
     prompt = data.get('prompt', '').strip()
-    default_model = 'veo-3.1-generate-001' if _is_vertex() else 'veo-2.0-generate-001'
+    default_model = 'veo-3.1-fast-generate-001' if _is_vertex() else 'veo-2.0-generate-001'
     model_name = data.get('model', default_model)
     asset_id = data.get('asset_id')
     view_id = data.get('view_id')

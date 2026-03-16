@@ -12,7 +12,7 @@
         <div class="header-actions">
             <input type="text" id="header-search" class="header-search" placeholder="Search assets...">
             <button id="header-new-asset-btn" class="btn btn-primary btn-small">+ New Asset</button>
-            <button id="header-generate-btn" class="btn btn-accent btn-small">Generate</button>
+            <button id="header-chat-btn" class="btn btn-accent btn-small">Chat</button>
             <button id="header-settings-btn" class="btn btn-secondary btn-small" title="Project Settings">&#9881;</button>
         </div>
     </header>
@@ -1159,6 +1159,32 @@
         </div>
     </div>
 
+    <!-- Chat Modal -->
+    <div id="chat-modal" class="modal-overlay" hidden>
+        <div class="modal-dialog chat-modal-dialog">
+            <div class="modal-header">
+                <h3>Chat Assistant</h3>
+                <div class="chat-header-actions">
+                    <button id="chat-new-btn" class="btn btn-secondary btn-small" title="New conversation">New</button>
+                    <button id="chat-close-btn" class="btn btn-secondary btn-small">X</button>
+                </div>
+            </div>
+            <div class="modal-body chat-modal-body">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="chat-welcome">
+                        <p>I can help you craft the perfect prompts for generating game art assets.</p>
+                        <button id="chat-interview-btn" class="btn btn-primary">Ask me questions</button>
+                        <p class="hint">Or just type a message below to chat freely.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <textarea id="chat-input" class="chat-input" placeholder="Describe what you want to create..." rows="2"></textarea>
+                <button id="chat-send-btn" class="btn btn-primary btn-small">Send</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/app.js"></script>
     <script src="/static/js/upload.js"></script>
     <script src="/static/js/extract.js"></script>
@@ -1175,5 +1201,6 @@
     <script src="/static/js/ai-music.js"></script>
     <script src="/static/js/project-settings.js"></script>
     <script src="/static/js/markup.js"></script>
+    <script src="/static/js/chat.js"></script>
 </body>
 </html>

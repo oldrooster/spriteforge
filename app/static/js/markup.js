@@ -140,6 +140,7 @@
         canvasWrap.hidden = false;
         updateHistoryButtons();
         renderLayersPanel();
+        if (useAsRefBtn) useAsRefBtn.hidden = false;
     }
 
     // ── Tool switching ──
@@ -916,6 +917,10 @@
                 window.markupReturnToAiGenerate(blob);
                 window.markupReturnToAiGenerate = null;
                 useAsRefBtn.hidden = true;
+            } else {
+                // No callback — navigate to AI Generate with the blob
+                window.pendingReferenceBlob = blob;
+                navigate('#/asset/' + (state.currentAssetId || '') + '/tool/ai-generate');
             }
         });
     }

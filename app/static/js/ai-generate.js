@@ -36,6 +36,19 @@
                 loadPrompts();
                 modelsLoaded = true;
             }
+            // Consume prompt from chat assistant
+            if (window.pendingChatPrompt) {
+                promptInput.value = window.pendingChatPrompt;
+                window.pendingChatPrompt = null;
+            }
+            // Consume reference blob from markup tool
+            if (window.pendingReferenceBlob) {
+                referenceBlob = window.pendingReferenceBlob;
+                refImg.src = URL.createObjectURL(referenceBlob);
+                refPreview.hidden = false;
+                refClearBtn.hidden = false;
+                window.pendingReferenceBlob = null;
+            }
             // Phase C: consume pending resource from context menu
             if (state.pendingToolResource) {
                 const pending = state.pendingToolResource;

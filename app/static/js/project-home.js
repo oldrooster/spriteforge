@@ -169,13 +169,7 @@
     modalName.addEventListener('keydown', (e) => { if (e.key === 'Enter') modalConfirm.click(); });
     modalTags.addEventListener('keydown', (e) => { if (e.key === 'Enter') modalConfirm.click(); });
 
-    // ── Generate button (standalone AI generate) ──
-    const headerGenerateBtn = document.getElementById('header-generate-btn');
-    if (headerGenerateBtn) {
-        headerGenerateBtn.addEventListener('click', () => {
-            navigate('#/tool/ai-generate');
-        });
-    }
+    // ── Chat button (removed – now handled by chat.js) ──
 
     // ── Auto-load when panel becomes visible ──
 

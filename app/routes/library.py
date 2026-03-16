@@ -667,6 +667,53 @@ def delete_view(asset_id, view_id):
     return jsonify({'ok': True})
 
 
+@library_bp.route('/assets/<asset_id>/views/<view_id>/duplicate', methods=['POST'])
+def duplicate_view(asset_id, view_id):
+    asset = _read_json(_asset_path(asset_id))
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+
+    source_view = None
+    for v in asset.get('views', []):
+        if v['id'] == view_id:
+            source_view = v
+            break
+    if not source_view:
+        return jsonify({'error': 'View not found'}), 404
+
+    new_view_id = str(uuid.uuid4())
+    src_dir = _view_dir(asset_id, view_id)
+    dest_dir = _view_dir(asset_id, new_view_id)
+    os.makedirs(dest_dir, exist_ok=True)
+
+    # Copy all frame files
+    if os.path.isdir(src_dir):
+        for fname in os.listdir(src_dir):
+            if fname.startswith('frame_') and fname.endswith('.png'):
+                shutil.copy2(os.path.join(src_dir, fname), os.path.join(dest_dir, fname))
+
+    # Auto-assign ags_loop
+    existing_loops = [v.get('ags_loop', -1) for v in asset.get('views', [])]
+    ags_loop = max(existing_loops, default=-1) + 1
+
+    new_view = {
+        'id': new_view_id,
+        'name': source_view['name'] + ' (Copy)',
+        'ags_loop': ags_loop,
+        'frame_count': source_view.get('frame_count', 0),
+        'width': source_view.get('width', 0),
+        'height': source_view.get('height', 0),
+        'delay': source_view.get('delay', 100),
+    }
+
+    _write_json(os.path.join(dest_dir, 'view.json'), new_view)
+    asset['views'].append(new_view)
+    _write_json(_asset_path(asset_id), asset)
+    _sync_asset_index(asset_id, asset)
+
+    return jsonify(new_view), 201
+
+
 @library_bp.route('/assets/<asset_id>/views/<view_id>/frames/<filename>', methods=['GET'])
 def serve_frame(asset_id, view_id, filename):
     view_d = _view_dir(asset_id, view_id)
