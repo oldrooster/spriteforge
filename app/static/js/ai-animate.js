@@ -25,6 +25,7 @@
     const endMarkupBtn = document.getElementById('ai-animate-end-markup-btn');
     const endChangeBtn = document.getElementById('ai-animate-end-change-btn');
     const endRemoveBtn = document.getElementById('ai-animate-end-remove-btn');
+    const swapBtn = document.getElementById('ai-animate-swap-btn');
 
     // Prompt dropdown elements
     const promptSearch = document.getElementById('ai-animate-prompt-search');
@@ -36,9 +37,11 @@
     let pollTimer = null;
     let prompts = [];
 
-    // Track start/end frame data
-    let startFrameBlob = null;  // Blob or null (if null, use selectedSprite URL)
-    let endFrameBlob = null;    // Blob or null
+    // Track start/end frame data — always blob-based now
+    let startFrameBlob = null;
+    let startFrameSrc = null;   // URL string (for img src when no blob)
+    let endFrameBlob = null;
+    let endFrameSrc = null;
     let hasEndFrame = false;
 
     // Load models and prompts on first activation
@@ -59,13 +62,10 @@
                     asset_id: pending.asset_id,
                     asset_name: pending.filename,
                     resource_id: pending.resource_id,
-                    view_id: null,
-                    view_name: pending.filename,
-                    frame_index: 1,
-                    frame_count: 1,
                 };
-                startImg.src = pending.resource_url;
                 startFrameBlob = null;
+                startFrameSrc = pending.resource_url;
+                startImg.src = pending.resource_url;
                 sourceWrap.hidden = false;
                 dropzone.hidden = true;
                 sourceInfo.textContent = pending.filename;
@@ -81,21 +81,27 @@
 
                 if (target === 'start') {
                     startFrameBlob = blob;
+                    startFrameSrc = null;
                     startImg.src = URL.createObjectURL(blob);
                 } else {
-                    endFrameBlob = blob;
-                    endImg.src = URL.createObjectURL(blob);
-                    endImg.hidden = false;
-                    endPlaceholder.hidden = true;
-                    endMarkupBtn.hidden = false;
-                    endChangeBtn.hidden = false;
-                    endRemoveBtn.hidden = false;
-                    hasEndFrame = true;
+                    setEndFrame(blob, null);
                 }
             }
         }
     });
     observer.observe(toolPanel, { attributes: true, attributeFilter: ['class'] });
+
+    function setEndFrame(blob, src) {
+        endFrameBlob = blob;
+        endFrameSrc = src;
+        endImg.src = blob ? URL.createObjectURL(blob) : src;
+        endImg.hidden = false;
+        endPlaceholder.hidden = true;
+        endMarkupBtn.hidden = false;
+        endChangeBtn.hidden = false;
+        endRemoveBtn.hidden = false;
+        hasEndFrame = true;
+    }
 
     async function loadModels() {
         try {
@@ -220,21 +226,21 @@
 
     const framePicker = document.getElementById('ai-animate-frame-picker');
 
-    // Helper: open library modal to pick an image and return a blob
+    // Helper: open library modal to pick an image resource and return a blob
     function pickImageFromLibrary(callback) {
         if (typeof window.openLibraryModal !== 'function') return;
 
         window.openLibraryModal({
-            mode: 'loops',
+            mode: 'image-resources',
             title: 'Select Image',
             onSelect: async function (result) {
-                var loop = result.items[0];
+                var resource = result.items[0];
                 var sprite = result.sprite;
-                var baseUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/frame_0001.png';
+                var url = '/api/assets/' + sprite.id + '/resources/' + resource.id + '/file';
                 try {
-                    var resp = await fetch(baseUrl);
+                    var resp = await fetch(url);
                     var blob = await resp.blob();
-                    callback(blob, baseUrl, sprite, loop);
+                    callback(blob, url, sprite, resource);
                 } catch (e) {
                     showError('Failed to load image');
                 }
@@ -242,58 +248,37 @@
         });
     }
 
-    // Select sprite from library (sets start frame + populates filmstrip)
+    // Select source from library (sets start frame)
     selectBtn.addEventListener('click', function () {
         if (typeof window.openLibraryModal !== 'function') return;
 
         window.openLibraryModal({
-            mode: 'loops',
-            title: 'Select Sprite to Animate',
-            onSelect: function (result) {
-                var loop = result.items[0];
+            mode: 'image-resources',
+            title: 'Select Start Image',
+            onSelect: async function (result) {
+                var resource = result.items[0];
                 var sprite = result.sprite;
+                var url = '/api/assets/' + sprite.id + '/resources/' + resource.id + '/file';
+
                 selectedSprite = {
                     asset_id: sprite.id,
                     asset_name: sprite.name,
-                    view_id: loop.id,
-                    view_name: loop.name,
-                    frame_index: 1,
-                    frame_count: loop.frame_count || 1,
+                    resource_id: resource.id,
                 };
 
-                var baseUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/';
-                startImg.src = baseUrl + 'frame_0001.png';
                 startFrameBlob = null;
+                startFrameSrc = url;
+                startImg.src = url;
                 sourceWrap.hidden = false;
                 dropzone.hidden = true;
-                sourceInfo.textContent = sprite.name + ' - ' + loop.name + ' (Frame 1 of ' + loop.frame_count + ')';
+                sourceInfo.textContent = sprite.name + ' - ' + resource.filename;
                 animateBtn.disabled = false;
 
                 // Reset end frame
                 clearEndFrame();
 
-                // Build frame picker filmstrip
+                // Clear filmstrip (not used for resources)
                 framePicker.innerHTML = '';
-                for (var i = 1; i <= loop.frame_count; i++) {
-                    (function (idx) {
-                        var frameName = 'frame_' + String(idx).padStart(4, '0') + '.png';
-                        var thumb = document.createElement('img');
-                        thumb.src = baseUrl + frameName;
-                        thumb.className = 'filmstrip-frame' + (idx === 1 ? ' active' : '');
-                        thumb.title = 'Frame ' + idx;
-                        thumb.addEventListener('click', function () {
-                            selectedSprite.frame_index = idx;
-                            startImg.src = baseUrl + frameName;
-                            startFrameBlob = null;
-                            sourceInfo.textContent = sprite.name + ' - ' + loop.name + ' (Frame ' + idx + ' of ' + loop.frame_count + ')';
-                            framePicker.querySelectorAll('.filmstrip-frame').forEach(function (f) {
-                                f.classList.remove('active');
-                            });
-                            thumb.classList.add('active');
-                        });
-                        framePicker.appendChild(thumb);
-                    })(i);
-                }
             },
         });
     });
@@ -302,12 +287,12 @@
     startChangeBtn.addEventListener('click', function () {
         pickImageFromLibrary(function (blob, url) {
             startFrameBlob = blob;
+            startFrameSrc = null;
             startImg.src = URL.createObjectURL(blob);
         });
     });
 
     startMarkupBtn.addEventListener('click', function () {
-        // Get the current start image as a blob and send to markup
         getFrameBlob('start', function (blob) {
             window.pendingAnimateMarkupTarget = 'start';
             window.markupReturnToAiAnimate = function (editedBlob) {
@@ -317,7 +302,6 @@
             window.pendingToolResource = null;
             state.pendingToolView = null;
 
-            // Pass image to markup via a pending blob
             window.pendingMarkupBlob = blob;
             if (state.currentAssetId) {
                 navigate('#/asset/' + state.currentAssetId + '/tool/markup');
@@ -330,21 +314,13 @@
     // ── End frame actions ──
     endPlaceholder.addEventListener('click', function () {
         pickImageFromLibrary(function (blob, url) {
-            endFrameBlob = blob;
-            endImg.src = URL.createObjectURL(blob);
-            endImg.hidden = false;
-            endPlaceholder.hidden = true;
-            endMarkupBtn.hidden = false;
-            endChangeBtn.hidden = false;
-            endRemoveBtn.hidden = false;
-            hasEndFrame = true;
+            setEndFrame(blob, null);
         });
     });
 
     endChangeBtn.addEventListener('click', function () {
         pickImageFromLibrary(function (blob, url) {
-            endFrameBlob = blob;
-            endImg.src = URL.createObjectURL(blob);
+            setEndFrame(blob, null);
         });
     });
 
@@ -371,8 +347,27 @@
         clearEndFrame();
     });
 
+    // ── Swap start and end frames ──
+    swapBtn.addEventListener('click', function () {
+        if (!hasEndFrame) return;
+
+        // Swap blobs
+        var tmpBlob = startFrameBlob;
+        var tmpSrc = startFrameSrc;
+        startFrameBlob = endFrameBlob;
+        startFrameSrc = endFrameSrc;
+        endFrameBlob = tmpBlob;
+        endFrameSrc = tmpSrc;
+
+        // Swap visible images
+        var startSrcVal = startImg.src;
+        startImg.src = endImg.src;
+        endImg.src = startSrcVal;
+    });
+
     function clearEndFrame() {
         endFrameBlob = null;
+        endFrameSrc = null;
         hasEndFrame = false;
         endImg.src = '';
         endImg.hidden = true;
@@ -412,6 +407,7 @@
         actionsSection.hidden = true;
 
         try {
+            // Always send as FormData — fetch start blob if needed
             var formData = new FormData();
             formData.append('prompt', promptInput.value.trim());
             formData.append('model', modelSelect.value);
@@ -419,24 +415,26 @@
             formData.append('asset_id', selectedSprite.asset_id);
             formData.append('generate_audio', document.getElementById('ai-animate-audio').checked ? 'true' : 'false');
 
-            // If we have a custom start frame blob, send it as file
             if (startFrameBlob) {
                 formData.append('start_frame', startFrameBlob, 'start_frame.png');
+            } else if (startFrameSrc) {
+                // Fetch the image from URL and send as blob
+                var startResp = await fetch(startFrameSrc);
+                var startBlob = await startResp.blob();
+                formData.append('start_frame', startBlob, 'start_frame.png');
             } else {
-                // Send sprite reference for server to locate the image
-                formData.append('view_id', selectedSprite.view_id || '');
                 formData.append('resource_id', selectedSprite.resource_id || '');
-                formData.append('frame_index', selectedSprite.frame_index);
             }
 
             // End frame
-            if (hasEndFrame && endFrameBlob) {
-                formData.append('end_frame', endFrameBlob, 'end_frame.png');
-            } else if (hasEndFrame) {
-                // End frame from img src - fetch it
-                var endResp = await fetch(endImg.src);
-                var endBlob = await endResp.blob();
-                formData.append('end_frame', endBlob, 'end_frame.png');
+            if (hasEndFrame) {
+                if (endFrameBlob) {
+                    formData.append('end_frame', endFrameBlob, 'end_frame.png');
+                } else if (endFrameSrc) {
+                    var endResp = await fetch(endFrameSrc);
+                    var endBlob = await endResp.blob();
+                    formData.append('end_frame', endBlob, 'end_frame.png');
+                }
             }
 
             var resp = await fetch('/api/ai-animate', {

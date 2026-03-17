@@ -48,10 +48,15 @@
                 return;
             }
 
-            // Filter: for 'loops' mode, only show assets with views
-            const filtered = modalMode === 'loops'
-                ? assets.filter(a => (a.view_count || 0) > 0)
-                : assets;
+            // Filter based on mode
+            let filtered;
+            if (modalMode === 'loops') {
+                filtered = assets.filter(a => (a.view_count || 0) > 0);
+            } else if (modalMode === 'image-resources') {
+                filtered = assets.filter(a => (a.resource_count || 0) > 0);
+            } else {
+                filtered = assets;
+            }
 
             if (filtered.length === 0) {
                 const msg = modalMode === 'loops' ? 'No assets with views' : 'No assets with video resources';
@@ -90,6 +95,8 @@
 
         if (modalMode === 'video') {
             showModalResources();
+        } else if (modalMode === 'image-resources') {
+            showModalImageResources();
         } else {
             showModalViews();
         }
@@ -126,6 +133,52 @@
             name.textContent = r.filename;
 
             item.appendChild(icon);
+            item.appendChild(name);
+            modalLoops.appendChild(item);
+        });
+    }
+
+    function showModalImageResources() {
+        modalSprites.hidden = true;
+        modalLoops.hidden = false;
+        modalBack.hidden = false;
+        modalLoops.innerHTML = '';
+        modalSelectedItems = [];
+        modalConfirm.disabled = true;
+
+        const resources = (modalSelectedAsset.resources || []).filter(r => r.type === 'image');
+        if (resources.length === 0) {
+            modalLoops.innerHTML = '<p class="hint" style="text-align:center;padding:20px;">No image resources in this asset</p>';
+            return;
+        }
+
+        resources.forEach(r => {
+            const item = document.createElement('div');
+            item.className = 'modal-loop-item';
+            item.style.display = 'flex';
+            item.style.alignItems = 'center';
+            item.style.gap = '10px';
+            item.addEventListener('click', () => {
+                modalLoops.querySelectorAll('.modal-loop-item').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+                modalSelectedItems = [r];
+                modalConfirm.disabled = false;
+                modalInfo.textContent = r.filename;
+            });
+
+            const thumb = document.createElement('img');
+            thumb.src = `/api/assets/${modalSelectedAsset.id}/resources/${r.id}/file`;
+            thumb.style.width = '48px';
+            thumb.style.height = '48px';
+            thumb.style.objectFit = 'contain';
+            thumb.style.imageRendering = 'pixelated';
+            thumb.style.borderRadius = '4px';
+            thumb.style.background = 'var(--bg-secondary)';
+
+            const name = document.createElement('span');
+            name.textContent = r.filename;
+
+            item.appendChild(thumb);
             item.appendChild(name);
             modalLoops.appendChild(item);
         });

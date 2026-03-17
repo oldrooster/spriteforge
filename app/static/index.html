@@ -753,7 +753,9 @@
                                         <button id="ai-animate-start-change-btn" class="btn btn-secondary btn-small" title="Change image">Change</button>
                                     </div>
                                 </div>
-                                <div class="animate-frame-arrow">&#8594;</div>
+                                <div class="animate-frame-arrow">
+                                    <button id="ai-animate-swap-btn" class="btn btn-secondary btn-small animate-swap-btn" title="Swap start and end frames">&#8644;</button>
+                                </div>
                                 <div class="animate-frame-slot">
                                     <label>End Frame <span class="hint">(optional)</span></label>
                                     <div class="animate-frame-preview" id="ai-animate-end-preview">
@@ -770,11 +772,7 @@
                                 </div>
                             </div>
                             <span class="hint" id="ai-animate-source-info"></span>
-                            <div class="setting-group" style="margin-top:12px;">
-                                <label>Select Frame</label>
-                                <span class="hint">Click a frame to use as the start image</span>
-                                <div id="ai-animate-frame-picker" class="filmstrip" style="margin-top:8px;"></div>
-                            </div>
+                            <div id="ai-animate-frame-picker" hidden></div>
                         </div>
                         <div id="ai-animate-result" hidden>
                             <h3>Generated Animation</h3>
@@ -783,7 +781,7 @@
                     </div>
                     <div class="ai-settings">
                         <div class="setting-group">
-                            <label>Source Sprite</label>
+                            <label>Source Image</label>
                             <button id="ai-animate-select-btn" class="btn btn-secondary" style="width:100%">Select from Library</button>
                         </div>
                         <div class="setting-group">
