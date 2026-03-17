@@ -742,11 +742,37 @@
                             </div>
                         </div>
                         <div id="ai-animate-source-wrap" hidden>
-                            <img id="ai-animate-source-img" alt="Source sprite">
+                            <div class="animate-frames-row">
+                                <div class="animate-frame-slot">
+                                    <label>Start Frame</label>
+                                    <div class="animate-frame-preview">
+                                        <img id="ai-animate-start-img" alt="Start frame">
+                                    </div>
+                                    <div class="animate-frame-actions">
+                                        <button id="ai-animate-start-markup-btn" class="btn btn-secondary btn-small" title="Edit in Markup">Markup</button>
+                                        <button id="ai-animate-start-change-btn" class="btn btn-secondary btn-small" title="Change image">Change</button>
+                                    </div>
+                                </div>
+                                <div class="animate-frame-arrow">&#8594;</div>
+                                <div class="animate-frame-slot">
+                                    <label>End Frame <span class="hint">(optional)</span></label>
+                                    <div class="animate-frame-preview" id="ai-animate-end-preview">
+                                        <img id="ai-animate-end-img" alt="End frame" hidden>
+                                        <div id="ai-animate-end-placeholder" class="animate-frame-placeholder">
+                                            <span>+ Add End Frame</span>
+                                        </div>
+                                    </div>
+                                    <div class="animate-frame-actions">
+                                        <button id="ai-animate-end-markup-btn" class="btn btn-secondary btn-small" title="Edit in Markup" hidden>Markup</button>
+                                        <button id="ai-animate-end-change-btn" class="btn btn-secondary btn-small" title="Change image" hidden>Change</button>
+                                        <button id="ai-animate-end-remove-btn" class="btn btn-secondary btn-small" title="Remove end frame" hidden>Remove</button>
+                                    </div>
+                                </div>
+                            </div>
                             <span class="hint" id="ai-animate-source-info"></span>
                             <div class="setting-group" style="margin-top:12px;">
                                 <label>Select Frame</label>
-                                <span class="hint">Click a frame to use as the source image</span>
+                                <span class="hint">Click a frame to use as the start image</span>
                                 <div id="ai-animate-frame-picker" class="filmstrip" style="margin-top:8px;"></div>
                             </div>
                         </div>

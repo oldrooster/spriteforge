@@ -2924,3 +2924,74 @@ hr {
     outline: none;
     border-color: var(--accent);
 }
+
+/* ── AI Animate Start/End Frames ── */
+.animate-frames-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    justify-content: center;
+}
+
+.animate-frame-slot {
+    flex: 1;
+    max-width: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.animate-frame-slot > label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.animate-frame-preview {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+}
+
+.animate-frame-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.animate-frame-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 13px;
+    transition: background 0.15s;
+}
+
+.animate-frame-placeholder:hover {
+    background: var(--bg-primary);
+    color: var(--accent);
+}
+
+.animate-frame-arrow {
+    font-size: 24px;
+    color: var(--text-secondary);
+    padding-top: 60px;
+    flex-shrink: 0;
+}
+
+.animate-frame-actions {
+    display: flex;
+    gap: 4px;
+}

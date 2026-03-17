@@ -2,7 +2,10 @@
     const selectBtn = document.getElementById('ai-animate-select-btn');
     const dropzone = document.getElementById('ai-animate-dropzone');
     const sourceWrap = document.getElementById('ai-animate-source-wrap');
-    const sourceImg = document.getElementById('ai-animate-source-img');
+    const startImg = document.getElementById('ai-animate-start-img');
+    const endImg = document.getElementById('ai-animate-end-img');
+    const endPlaceholder = document.getElementById('ai-animate-end-placeholder');
+    const endPreview = document.getElementById('ai-animate-end-preview');
     const sourceInfo = document.getElementById('ai-animate-source-info');
     const modelSelect = document.getElementById('ai-animate-model');
     const promptInput = document.getElementById('ai-animate-prompt');
@@ -16,6 +19,13 @@
     const downloadBtn = document.getElementById('ai-animate-download-btn');
     const errorEl = document.getElementById('ai-animate-error');
 
+    // Start/End frame buttons
+    const startMarkupBtn = document.getElementById('ai-animate-start-markup-btn');
+    const startChangeBtn = document.getElementById('ai-animate-start-change-btn');
+    const endMarkupBtn = document.getElementById('ai-animate-end-markup-btn');
+    const endChangeBtn = document.getElementById('ai-animate-end-change-btn');
+    const endRemoveBtn = document.getElementById('ai-animate-end-remove-btn');
+
     // Prompt dropdown elements
     const promptSearch = document.getElementById('ai-animate-prompt-search');
     const promptDropdown = document.getElementById('ai-animate-prompt-dropdown');
@@ -25,6 +35,11 @@
     let sessionId = null;
     let pollTimer = null;
     let prompts = [];
+
+    // Track start/end frame data
+    let startFrameBlob = null;  // Blob or null (if null, use selectedSprite URL)
+    let endFrameBlob = null;    // Blob or null
+    let hasEndFrame = false;
 
     // Load models and prompts on first activation
     let modelsLoaded = false;
@@ -36,7 +51,7 @@
                 loadPrompts();
                 modelsLoaded = true;
             }
-            // Phase C: consume pending resource from context menu
+            // Consume pending resource from context menu
             if (state.pendingToolResource) {
                 var pending = state.pendingToolResource;
                 state.pendingToolResource = null;
@@ -49,12 +64,34 @@
                     frame_index: 1,
                     frame_count: 1,
                 };
-                sourceImg.src = pending.resource_url;
+                startImg.src = pending.resource_url;
+                startFrameBlob = null;
                 sourceWrap.hidden = false;
                 dropzone.hidden = true;
                 sourceInfo.textContent = pending.filename;
                 animateBtn.disabled = false;
-                framePicker.innerHTML = '';
+                document.getElementById('ai-animate-frame-picker').innerHTML = '';
+            }
+            // Consume markup result for start or end frame
+            if (window.pendingAnimateMarkupBlob) {
+                var target = window.pendingAnimateMarkupTarget || 'start';
+                var blob = window.pendingAnimateMarkupBlob;
+                window.pendingAnimateMarkupBlob = null;
+                window.pendingAnimateMarkupTarget = null;
+
+                if (target === 'start') {
+                    startFrameBlob = blob;
+                    startImg.src = URL.createObjectURL(blob);
+                } else {
+                    endFrameBlob = blob;
+                    endImg.src = URL.createObjectURL(blob);
+                    endImg.hidden = false;
+                    endPlaceholder.hidden = true;
+                    endMarkupBtn.hidden = false;
+                    endChangeBtn.hidden = false;
+                    endRemoveBtn.hidden = false;
+                    hasEndFrame = true;
+                }
             }
         }
     });
@@ -82,7 +119,6 @@
         try {
             var resp = await fetch('/api/ai-generate/prompts');
             var data = await resp.json();
-            // Filter to video/both prompts
             prompts = data.prompts.filter(function (p) {
                 return p.gen_type === 'video' || p.gen_type === 'both';
             });
@@ -150,14 +186,12 @@
         renderDropdown(promptSearch.value);
     });
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', function (e) {
         if (!promptSearch.contains(e.target) && !promptDropdown.contains(e.target)) {
             promptDropdown.hidden = true;
         }
     });
 
-    // Save current prompt
     savePromptBtn.addEventListener('click', async function () {
         var text = promptInput.value.trim();
         if (!text) { showError('Enter a prompt first'); return; }
@@ -186,7 +220,29 @@
 
     const framePicker = document.getElementById('ai-animate-frame-picker');
 
-    // Select sprite from library
+    // Helper: open library modal to pick an image and return a blob
+    function pickImageFromLibrary(callback) {
+        if (typeof window.openLibraryModal !== 'function') return;
+
+        window.openLibraryModal({
+            mode: 'loops',
+            title: 'Select Image',
+            onSelect: async function (result) {
+                var loop = result.items[0];
+                var sprite = result.sprite;
+                var baseUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/frame_0001.png';
+                try {
+                    var resp = await fetch(baseUrl);
+                    var blob = await resp.blob();
+                    callback(blob, baseUrl, sprite, loop);
+                } catch (e) {
+                    showError('Failed to load image');
+                }
+            },
+        });
+    }
+
+    // Select sprite from library (sets start frame + populates filmstrip)
     selectBtn.addEventListener('click', function () {
         if (typeof window.openLibraryModal !== 'function') return;
 
@@ -206,11 +262,15 @@
                 };
 
                 var baseUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/';
-                sourceImg.src = baseUrl + 'frame_0001.png';
+                startImg.src = baseUrl + 'frame_0001.png';
+                startFrameBlob = null;
                 sourceWrap.hidden = false;
                 dropzone.hidden = true;
                 sourceInfo.textContent = sprite.name + ' - ' + loop.name + ' (Frame 1 of ' + loop.frame_count + ')';
                 animateBtn.disabled = false;
+
+                // Reset end frame
+                clearEndFrame();
 
                 // Build frame picker filmstrip
                 framePicker.innerHTML = '';
@@ -223,7 +283,8 @@
                         thumb.title = 'Frame ' + idx;
                         thumb.addEventListener('click', function () {
                             selectedSprite.frame_index = idx;
-                            sourceImg.src = baseUrl + frameName;
+                            startImg.src = baseUrl + frameName;
+                            startFrameBlob = null;
                             sourceInfo.textContent = sprite.name + ' - ' + loop.name + ' (Frame ' + idx + ' of ' + loop.frame_count + ')';
                             framePicker.querySelectorAll('.filmstrip-frame').forEach(function (f) {
                                 f.classList.remove('active');
@@ -237,6 +298,108 @@
         });
     });
 
+    // ── Start frame actions ──
+    startChangeBtn.addEventListener('click', function () {
+        pickImageFromLibrary(function (blob, url) {
+            startFrameBlob = blob;
+            startImg.src = URL.createObjectURL(blob);
+        });
+    });
+
+    startMarkupBtn.addEventListener('click', function () {
+        // Get the current start image as a blob and send to markup
+        getFrameBlob('start', function (blob) {
+            window.pendingAnimateMarkupTarget = 'start';
+            window.markupReturnToAiAnimate = function (editedBlob) {
+                window.pendingAnimateMarkupBlob = editedBlob;
+                window.pendingAnimateMarkupTarget = 'start';
+            };
+            window.pendingToolResource = null;
+            state.pendingToolView = null;
+
+            // Pass image to markup via a pending blob
+            window.pendingMarkupBlob = blob;
+            if (state.currentAssetId) {
+                navigate('#/asset/' + state.currentAssetId + '/tool/markup');
+            } else {
+                navigate('#/tool/markup');
+            }
+        });
+    });
+
+    // ── End frame actions ──
+    endPlaceholder.addEventListener('click', function () {
+        pickImageFromLibrary(function (blob, url) {
+            endFrameBlob = blob;
+            endImg.src = URL.createObjectURL(blob);
+            endImg.hidden = false;
+            endPlaceholder.hidden = true;
+            endMarkupBtn.hidden = false;
+            endChangeBtn.hidden = false;
+            endRemoveBtn.hidden = false;
+            hasEndFrame = true;
+        });
+    });
+
+    endChangeBtn.addEventListener('click', function () {
+        pickImageFromLibrary(function (blob, url) {
+            endFrameBlob = blob;
+            endImg.src = URL.createObjectURL(blob);
+        });
+    });
+
+    endMarkupBtn.addEventListener('click', function () {
+        getFrameBlob('end', function (blob) {
+            window.pendingAnimateMarkupTarget = 'end';
+            window.markupReturnToAiAnimate = function (editedBlob) {
+                window.pendingAnimateMarkupBlob = editedBlob;
+                window.pendingAnimateMarkupTarget = 'end';
+            };
+            window.pendingToolResource = null;
+            state.pendingToolView = null;
+
+            window.pendingMarkupBlob = blob;
+            if (state.currentAssetId) {
+                navigate('#/asset/' + state.currentAssetId + '/tool/markup');
+            } else {
+                navigate('#/tool/markup');
+            }
+        });
+    });
+
+    endRemoveBtn.addEventListener('click', function () {
+        clearEndFrame();
+    });
+
+    function clearEndFrame() {
+        endFrameBlob = null;
+        hasEndFrame = false;
+        endImg.src = '';
+        endImg.hidden = true;
+        endPlaceholder.hidden = false;
+        endMarkupBtn.hidden = true;
+        endChangeBtn.hidden = true;
+        endRemoveBtn.hidden = true;
+    }
+
+    // Helper to get a frame blob from its current src or stored blob
+    function getFrameBlob(which, callback) {
+        if (which === 'start' && startFrameBlob) {
+            callback(startFrameBlob);
+            return;
+        }
+        if (which === 'end' && endFrameBlob) {
+            callback(endFrameBlob);
+            return;
+        }
+        // Fetch from img src
+        var img = which === 'start' ? startImg : endImg;
+        fetch(img.src)
+            .then(function (r) { return r.blob(); })
+            .then(callback)
+            .catch(function () { showError('Failed to load image'); });
+    }
+
     // Generate animation
     animateBtn.addEventListener('click', async function () {
         if (!selectedSprite || !promptInput.value.trim()) return;
@@ -249,19 +412,36 @@
         actionsSection.hidden = true;
 
         try {
+            var formData = new FormData();
+            formData.append('prompt', promptInput.value.trim());
+            formData.append('model', modelSelect.value);
+            formData.append('duration', document.getElementById('ai-animate-duration').value);
+            formData.append('asset_id', selectedSprite.asset_id);
+            formData.append('generate_audio', document.getElementById('ai-animate-audio').checked ? 'true' : 'false');
+
+            // If we have a custom start frame blob, send it as file
+            if (startFrameBlob) {
+                formData.append('start_frame', startFrameBlob, 'start_frame.png');
+            } else {
+                // Send sprite reference for server to locate the image
+                formData.append('view_id', selectedSprite.view_id || '');
+                formData.append('resource_id', selectedSprite.resource_id || '');
+                formData.append('frame_index', selectedSprite.frame_index);
+            }
+
+            // End frame
+            if (hasEndFrame && endFrameBlob) {
+                formData.append('end_frame', endFrameBlob, 'end_frame.png');
+            } else if (hasEndFrame) {
+                // End frame from img src - fetch it
+                var endResp = await fetch(endImg.src);
+                var endBlob = await endResp.blob();
+                formData.append('end_frame', endBlob, 'end_frame.png');
+            }
+
             var resp = await fetch('/api/ai-animate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: promptInput.value.trim(),
-                    model: modelSelect.value,
-                    duration: parseInt(document.getElementById('ai-animate-duration').value, 10),
-                    asset_id: selectedSprite.asset_id,
-                    view_id: selectedSprite.view_id,
-                    resource_id: selectedSprite.resource_id || null,
-                    frame_index: selectedSprite.frame_index,
-                    generate_audio: document.getElementById('ai-animate-audio').checked,
-                }),
+                body: formData,
             });
             var data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Generation failed');

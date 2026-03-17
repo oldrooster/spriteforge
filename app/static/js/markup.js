@@ -93,18 +93,33 @@
 
     // ── Panel activation ──
     var observer = new MutationObserver(async function () {
-        if (toolPanel.classList.contains('active') && state.pendingToolResource) {
+        if (!toolPanel.classList.contains('active')) return;
+
+        // Consume a pending blob (from AI Animate markup button)
+        if (window.pendingMarkupBlob) {
+            var blob = window.pendingMarkupBlob;
+            window.pendingMarkupBlob = null;
+            pendingResource = null;
+            var img = new Image();
+            img.onload = function () {
+                initCanvas(img);
+            };
+            img.src = URL.createObjectURL(blob);
+            return;
+        }
+
+        if (state.pendingToolResource) {
             var pending = state.pendingToolResource;
             state.pendingToolResource = null;
             pendingResource = pending;
             try {
                 var resp = await fetch(pending.resource_url);
-                var blob = await resp.blob();
-                var img = new Image();
-                img.onload = function () {
-                    initCanvas(img);
+                var blob2 = await resp.blob();
+                var img2 = new Image();
+                img2.onload = function () {
+                    initCanvas(img2);
                 };
-                img.src = URL.createObjectURL(blob);
+                img2.src = URL.createObjectURL(blob2);
             } catch (e) {
                 alert('Failed to load image: ' + e.message);
             }
@@ -907,13 +922,18 @@
         URL.revokeObjectURL(url);
     });
 
-    // ── Use as Reference (return to AI Generate) ──
+    // ── Use as Reference (return to AI Generate or AI Animate) ──
     var useAsRefBtn = document.getElementById('markup-use-as-ref-btn');
     if (useAsRefBtn) {
         useAsRefBtn.addEventListener('click', async function () {
             if (!originalImage) return;
             var blob = await flattenToBlob();
-            if (typeof window.markupReturnToAiGenerate === 'function') {
+            if (typeof window.markupReturnToAiAnimate === 'function') {
+                window.markupReturnToAiAnimate(blob);
+                window.markupReturnToAiAnimate = null;
+                useAsRefBtn.hidden = true;
+                navigateBack();
+            } else if (typeof window.markupReturnToAiGenerate === 'function') {
                 window.markupReturnToAiGenerate(blob);
                 window.markupReturnToAiGenerate = null;
                 useAsRefBtn.hidden = true;

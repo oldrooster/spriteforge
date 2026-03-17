@@ -76,7 +76,7 @@ def _write_status(session_dir, status_data):
     os.replace(tmp, path)
 
 
-def _run_video_generation_ai_studio(session_dir, image_path, prompt, model_name, api_key, generate_audio=False, duration=4):
+def _run_video_generation_ai_studio(session_dir, image_path, prompt, model_name, api_key, generate_audio=False, duration=4, end_image_path=None):
     """Background worker for AI Studio (Gemini Developer API)."""
     import time
     try:
@@ -93,6 +93,11 @@ def _run_video_generation_ai_studio(session_dir, image_path, prompt, model_name,
         }
         if not generate_audio:
             config_kwargs['generate_audio'] = False
+
+        # Add last frame if provided
+        if end_image_path and os.path.exists(end_image_path):
+            last_frame = client.files.upload(file=end_image_path)
+            config_kwargs['last_frame'] = last_frame
 
         operation = client.models.generate_videos(
             model=model_name,
@@ -195,7 +200,7 @@ def _find_b64_recursive(obj, depth=0):
     return None
 
 
-def _run_video_generation_vertex(session_dir, image_path, prompt, model_name, project, location, generate_audio=False, duration=4):
+def _run_video_generation_vertex(session_dir, image_path, prompt, model_name, project, location, generate_audio=False, duration=4, end_image_path=None):
     """Background worker for Vertex AI using the REST API."""
     import time
     import base64
@@ -225,14 +230,25 @@ def _run_video_generation_vertex(session_dir, image_path, prompt, model_name, pr
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json; charset=utf-8',
         }
+        instance = {
+            'prompt': prompt,
+            'image': {
+                'bytesBase64Encoded': image_b64,
+                'mimeType': 'image/png',
+            },
+        }
+
+        # Add last frame if provided
+        if end_image_path and os.path.exists(end_image_path):
+            with open(end_image_path, 'rb') as f:
+                end_b64 = base64.b64encode(f.read()).decode('utf-8')
+            instance['lastFrame'] = {
+                'bytesBase64Encoded': end_b64,
+                'mimeType': 'image/png',
+            }
+
         body = {
-            'instances': [{
-                'prompt': prompt,
-                'image': {
-                    'bytesBase64Encoded': image_b64,
-                    'mimeType': 'image/png',
-                },
-            }],
+            'instances': [instance],
             'parameters': {
                 'aspectRatio': '16:9',
                 'personGeneration': 'allow_all',
@@ -336,29 +352,47 @@ def animate():
     if err:
         return err
 
-    data = request.get_json(force=True)
-    prompt = data.get('prompt', '').strip()
-    default_model = 'veo-3.1-fast-generate-001' if _is_vertex() else 'veo-2.0-generate-001'
-    model_name = data.get('model', default_model)
-    asset_id = data.get('asset_id')
-    view_id = data.get('view_id')
-    resource_id = data.get('resource_id')
-    frame_index = data.get('frame_index', 1)
-    duration = int(data.get('duration', 4))
-    generate_audio = bool(data.get('generate_audio', False))
+    # Accept both FormData (with file uploads) and JSON
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        prompt = (request.form.get('prompt') or '').strip()
+        default_model = 'veo-3.1-fast-generate-001' if _is_vertex() else 'veo-2.0-generate-001'
+        model_name = request.form.get('model', default_model)
+        asset_id = request.form.get('asset_id')
+        view_id = request.form.get('view_id', '').strip() or None
+        resource_id = request.form.get('resource_id', '').strip() or None
+        frame_index = request.form.get('frame_index', 1)
+        duration = int(request.form.get('duration', 4))
+        generate_audio = request.form.get('generate_audio', 'false').lower() == 'true'
+        start_frame_file = request.files.get('start_frame')
+        end_frame_file = request.files.get('end_frame')
+    else:
+        data = request.get_json(force=True)
+        prompt = data.get('prompt', '').strip()
+        default_model = 'veo-3.1-fast-generate-001' if _is_vertex() else 'veo-2.0-generate-001'
+        model_name = data.get('model', default_model)
+        asset_id = data.get('asset_id')
+        view_id = data.get('view_id')
+        resource_id = data.get('resource_id')
+        frame_index = data.get('frame_index', 1)
+        duration = int(data.get('duration', 4))
+        generate_audio = bool(data.get('generate_audio', False))
+        start_frame_file = None
+        end_frame_file = None
 
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
     if not asset_id:
         return jsonify({'error': 'asset_id is required'}), 400
-    if not view_id and not resource_id:
-        return jsonify({'error': 'view_id or resource_id is required'}), 400
 
-    # Find the source image in the library
-    lib_root = current_app.config['LIBRARY_FOLDER']
-    if resource_id and not view_id:
-        # Source is a resource file (launched from resource context menu)
-        import json
+    session_id = str(uuid.uuid4())
+    session_dir = _session_dir(current_app.config['OUTPUT_FOLDER'], session_id)
+
+    # Resolve the start frame image
+    if start_frame_file:
+        image_path = os.path.join(session_dir, 'start_frame.png')
+        start_frame_file.save(image_path)
+    elif resource_id and not view_id:
+        lib_root = current_app.config['LIBRARY_FOLDER']
         asset_path = os.path.join(lib_root, 'assets', asset_id, 'asset.json')
         with open(asset_path) as f:
             asset_data = json.load(f)
@@ -366,15 +400,21 @@ def animate():
         if not res:
             return jsonify({'error': 'Resource not found'}), 404
         image_path = os.path.join(lib_root, 'assets', asset_id, 'resources', res['stored_name'])
-    else:
+    elif view_id:
+        lib_root = current_app.config['LIBRARY_FOLDER']
         frame_name = f'frame_{int(frame_index):04d}.png'
         image_path = os.path.join(lib_root, 'assets', asset_id, 'views', view_id, frame_name)
+    else:
+        return jsonify({'error': 'No start frame provided'}), 400
 
     if not os.path.exists(image_path):
-        return jsonify({'error': f'Source image not found'}), 404
+        return jsonify({'error': 'Source image not found'}), 404
 
-    session_id = str(uuid.uuid4())
-    session_dir = _session_dir(current_app.config['OUTPUT_FOLDER'], session_id)
+    # Save end frame if provided
+    end_image_path = None
+    if end_frame_file:
+        end_image_path = os.path.join(session_dir, 'end_frame.png')
+        end_frame_file.save(end_image_path)
 
     _write_status(session_dir, {
         'status': 'processing',
@@ -385,18 +425,17 @@ def animate():
 
     if _is_vertex():
         gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-        # Video models (Veo) require a regional endpoint, not global
         gcp_location = os.environ.get('GOOGLE_CLOUD_VIDEO_LOCATION', 'us-central1').strip()
         thread = threading.Thread(
             target=_run_video_generation_vertex,
-            args=(session_dir, image_path, prompt, model_name, gcp_project, gcp_location, generate_audio, duration),
+            args=(session_dir, image_path, prompt, model_name, gcp_project, gcp_location, generate_audio, duration, end_image_path),
             daemon=True,
         )
     else:
         api_key = os.environ.get('GEMINI_API_KEY', '').strip()
         thread = threading.Thread(
             target=_run_video_generation_ai_studio,
-            args=(session_dir, image_path, prompt, model_name, api_key, generate_audio, duration),
+            args=(session_dir, image_path, prompt, model_name, api_key, generate_audio, duration, end_image_path),
             daemon=True,
         )
     thread.start()
