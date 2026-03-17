@@ -677,18 +677,16 @@
                                 placeholder="A knight character sprite, front-facing, pixel art style..."></textarea>
                         </div>
                         <div class="setting-group">
-                            <label>Reference Image <span class="hint">(optional)</span></label>
-                            <span class="hint">Provide an image to guide the generation</span>
-                            <div class="ai-ref-image-controls">
+                            <label>Reference Images <span class="hint">(optional, up to 4)</span></label>
+                            <span class="hint">Provide images to guide the generation</span>
+                            <div id="ai-generate-ref-grid" class="ai-ref-grid"></div>
+                            <div class="ai-ref-image-controls" id="ai-generate-ref-controls">
                                 <label class="btn btn-secondary btn-small">
                                     Upload
-                                    <input type="file" id="ai-generate-ref-upload" accept=".png,.jpg,.jpeg,.webp,.gif" hidden>
+                                    <input type="file" id="ai-generate-ref-upload" accept=".png,.jpg,.jpeg,.webp,.gif" multiple hidden>
                                 </label>
                                 <button id="ai-generate-ref-library-btn" class="btn btn-secondary btn-small">From Library</button>
-                                <button id="ai-generate-ref-clear-btn" class="btn btn-secondary btn-small" hidden>Clear</button>
-                            </div>
-                            <div id="ai-generate-ref-preview" class="ai-ref-preview" hidden>
-                                <img id="ai-generate-ref-img" alt="Reference image">
+                                <button id="ai-generate-ref-clear-btn" class="btn btn-secondary btn-small" hidden>Clear All</button>
                             </div>
                         </div>
                         <div class="setting-group">

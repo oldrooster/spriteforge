@@ -26,6 +26,8 @@
     let history = [];
     let prompts = [];
 
+    const MAX_REFS = 4;
+
     // Load models and prompts on first activation
     let modelsLoaded = false;
     const toolPanel = document.getElementById('tool-ai-generate');
@@ -43,22 +45,17 @@
             }
             // Consume reference blob from markup tool
             if (window.pendingReferenceBlob) {
-                referenceBlob = window.pendingReferenceBlob;
-                refImg.src = URL.createObjectURL(referenceBlob);
-                refPreview.hidden = false;
-                refClearBtn.hidden = false;
+                addReferenceBlob(window.pendingReferenceBlob);
                 window.pendingReferenceBlob = null;
             }
-            // Phase C: consume pending resource from context menu
+            // Consume pending resource from context menu
             if (state.pendingToolResource) {
                 const pending = state.pendingToolResource;
                 state.pendingToolResource = null;
                 try {
                     const resp = await fetch(pending.resource_url);
-                    referenceBlob = await resp.blob();
-                    refImg.src = URL.createObjectURL(referenceBlob);
-                    refPreview.hidden = false;
-                    refClearBtn.hidden = false;
+                    var blob = await resp.blob();
+                    addReferenceBlob(blob);
                 } catch (e) {
                     showError('Failed to load reference image');
                 }
@@ -84,21 +81,74 @@
         }
     }
 
-    // Reference image handling
+    // ── Multiple Reference Images ──
     const refUpload = document.getElementById('ai-generate-ref-upload');
     const refLibraryBtn = document.getElementById('ai-generate-ref-library-btn');
     const refClearBtn = document.getElementById('ai-generate-ref-clear-btn');
-    const refPreview = document.getElementById('ai-generate-ref-preview');
-    const refImg = document.getElementById('ai-generate-ref-img');
+    const refGrid = document.getElementById('ai-generate-ref-grid');
+    const refControls = document.getElementById('ai-generate-ref-controls');
 
-    let referenceBlob = null;
+    let referenceBlobs = [];
+
+    function addReferenceBlob(blob) {
+        if (referenceBlobs.length >= MAX_REFS) {
+            showError('Maximum ' + MAX_REFS + ' reference images allowed');
+            return;
+        }
+        referenceBlobs.push(blob);
+        renderRefGrid();
+    }
+
+    function removeReference(index) {
+        referenceBlobs.splice(index, 1);
+        renderRefGrid();
+    }
+
+    function clearAllReferences() {
+        referenceBlobs = [];
+        renderRefGrid();
+    }
+
+    function renderRefGrid() {
+        refGrid.innerHTML = '';
+        referenceBlobs.forEach(function (blob, i) {
+            var item = document.createElement('div');
+            item.className = 'ai-ref-item';
+
+            var img = document.createElement('img');
+            img.src = URL.createObjectURL(blob);
+            img.alt = 'Reference ' + (i + 1);
+            item.appendChild(img);
+
+            var removeBtn = document.createElement('button');
+            removeBtn.className = 'ai-ref-item-remove';
+            removeBtn.textContent = '\u00D7';
+            removeBtn.title = 'Remove';
+            removeBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                removeReference(i);
+            });
+            item.appendChild(removeBtn);
+
+            refGrid.appendChild(item);
+        });
+
+        refClearBtn.hidden = referenceBlobs.length === 0;
+
+        // Hide upload controls if at max
+        if (referenceBlobs.length >= MAX_REFS) {
+            refUpload.closest('label').hidden = true;
+            refLibraryBtn.hidden = true;
+        } else {
+            refUpload.closest('label').hidden = false;
+            refLibraryBtn.hidden = false;
+        }
+    }
 
     refUpload.addEventListener('change', function () {
-        if (refUpload.files.length > 0) {
-            referenceBlob = refUpload.files[0];
-            refImg.src = URL.createObjectURL(referenceBlob);
-            refPreview.hidden = false;
-            refClearBtn.hidden = false;
+        for (var i = 0; i < refUpload.files.length; i++) {
+            if (referenceBlobs.length >= MAX_REFS) break;
+            addReferenceBlob(refUpload.files[i]);
         }
         refUpload.value = '';
     });
@@ -106,18 +156,16 @@
     refLibraryBtn.addEventListener('click', function () {
         if (typeof window.openLibraryModal !== 'function') return;
         window.openLibraryModal({
-            mode: 'loops',
+            mode: 'image-resources',
             title: 'Select Reference Image',
             onSelect: async function (result) {
-                var loop = result.items[0];
+                var resource = result.items[0];
                 var sprite = result.sprite;
-                var imgUrl = '/api/assets/' + sprite.id + '/views/' + loop.id + '/frames/frame_0001.png';
+                var url = '/api/assets/' + sprite.id + '/resources/' + resource.id + '/file';
                 try {
-                    var resp = await fetch(imgUrl);
-                    referenceBlob = await resp.blob();
-                    refImg.src = URL.createObjectURL(referenceBlob);
-                    refPreview.hidden = false;
-                    refClearBtn.hidden = false;
+                    var resp = await fetch(url);
+                    var blob = await resp.blob();
+                    addReferenceBlob(blob);
                 } catch (e) {
                     showError('Failed to load reference image');
                 }
@@ -126,10 +174,7 @@
     });
 
     refClearBtn.addEventListener('click', function () {
-        referenceBlob = null;
-        refPreview.hidden = true;
-        refClearBtn.hidden = true;
-        refImg.src = '';
+        clearAllReferences();
     });
 
     // Paste image from clipboard
@@ -142,10 +187,7 @@
         for (var i = 0; i < items.length; i++) {
             if (items[i].type.indexOf('image') !== -1) {
                 e.preventDefault();
-                referenceBlob = items[i].getAsFile();
-                refImg.src = URL.createObjectURL(referenceBlob);
-                refPreview.hidden = false;
-                refClearBtn.hidden = false;
+                addReferenceBlob(items[i].getAsFile());
                 return;
             }
         }
@@ -156,7 +198,6 @@
         try {
             var resp = await fetch('/api/ai-generate/prompts');
             var data = await resp.json();
-            // Filter to image/both prompts
             prompts = data.prompts.filter(function (p) {
                 return !p.gen_type || p.gen_type === 'image' || p.gen_type === 'both';
             });
@@ -224,14 +265,12 @@
         renderDropdown(promptSearch.value);
     });
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', function (e) {
         if (!promptSearch.contains(e.target) && !promptDropdown.contains(e.target)) {
             promptDropdown.hidden = true;
         }
     });
 
-    // Save current prompt
     savePromptBtn.addEventListener('click', async function () {
         var text = promptInput.value.trim();
         if (!text) { showError('Enter a prompt first'); return; }
@@ -260,8 +299,8 @@
 
     // Generate
     generateBtn.addEventListener('click', async function () {
-        var prompt = promptInput.value.trim();
-        if (!prompt) return;
+        var promptText = promptInput.value.trim();
+        if (!promptText) return;
 
         generateBtn.disabled = true;
         progress.hidden = false;
@@ -269,12 +308,14 @@
 
         try {
             var resp;
-            if (referenceBlob) {
+            if (referenceBlobs.length > 0) {
                 var formData = new FormData();
-                formData.append('prompt', prompt);
+                formData.append('prompt', promptText);
                 formData.append('model', modelSelect.value);
-                formData.append('reference_image', referenceBlob, 'reference.png');
                 if (state.currentAssetId) formData.append('asset_id', state.currentAssetId);
+                referenceBlobs.forEach(function (blob, i) {
+                    formData.append('reference_images', blob, 'reference_' + i + '.png');
+                });
                 resp = await fetch('/api/ai-generate', {
                     method: 'POST',
                     body: formData,
@@ -284,7 +325,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        prompt: prompt,
+                        prompt: promptText,
                         model: modelSelect.value,
                         asset_id: state.currentAssetId || '',
                     }),
@@ -312,8 +353,8 @@
 
     // Refine
     refineBtn.addEventListener('click', async function () {
-        var prompt = refinePrompt.value.trim();
-        if (!prompt || !sessionId) return;
+        var promptText = refinePrompt.value.trim();
+        if (!promptText || !sessionId) return;
 
         refineBtn.disabled = true;
         progress.hidden = false;
@@ -326,7 +367,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     session_id: sessionId,
-                    prompt: prompt,
+                    prompt: promptText,
                     model: modelSelect.value,
                     reference_image: lastImage,
                     asset_id: state.currentAssetId || '',
@@ -402,28 +443,20 @@
         });
     });
 
-    // Edit in Markup - opens markup tool with current image, returns edited version as reference
+    // Edit in Markup
     const markupBtn = document.getElementById('ai-generate-markup-btn');
     if (markupBtn) {
         markupBtn.addEventListener('click', async function () {
             if (!currentImageUrl) return;
-            // Navigate to markup tool and load the image
             if (typeof window.markupTool === 'undefined') {
                 showError('Markup tool not available');
                 return;
             }
-            // Set a callback so markup can return the edited image
             window.markupReturnToAiGenerate = async function (blob) {
-                // Use the edited image as the reference image for next generation
-                referenceBlob = blob;
-                refImg.src = URL.createObjectURL(blob);
-                refPreview.hidden = false;
-                refClearBtn.hidden = false;
-                // Navigate back to AI Generate
+                addReferenceBlob(blob);
                 navigate('#/asset/' + (state.currentAssetId || '') + '/tool/ai-generate');
             };
             navigate('#/asset/' + (state.currentAssetId || '') + '/tool/markup');
-            // Wait for panel to activate, then load the image
             setTimeout(function () {
                 window.markupTool.loadImageFromUrl(currentImageUrl, null);
             }, 100);

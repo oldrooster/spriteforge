@@ -270,12 +270,14 @@ def generate():
     if request.content_type and 'multipart' in request.content_type:
         prompt = request.form.get('prompt', '').strip()
         model_name = request.form.get('model', 'gemini-2.5-flash-image')
-        ref_file = request.files.get('reference_image')
+        ref_files = request.files.getlist('reference_images')
+        asset_id = request.form.get('asset_id', '')
     else:
         data = request.get_json(force=True)
         prompt = data.get('prompt', '').strip()
         model_name = data.get('model', 'gemini-2.5-flash-image')
-        ref_file = None
+        ref_files = []
+        asset_id = data.get('asset_id', '')
 
     client, err = _get_client(model_name)
     if err:
@@ -285,11 +287,6 @@ def generate():
         return jsonify({'error': 'Prompt is required'}), 400
 
     # Template variable substitution
-    if request.content_type and 'multipart' in request.content_type:
-        asset_id = request.form.get('asset_id', '')
-    else:
-        asset_id = data.get('asset_id', '') if ref_file is None else ''
-
     from app.routes.library import _read_json, _project_path, _asset_path
     project = _read_json(_project_path('default'), {})
     asset_name = ''
@@ -306,13 +303,17 @@ def generate():
         from google.genai import types
         from PIL import Image
 
-        # Build contents: prompt + optional reference image
-        if ref_file:
-            ref_path = os.path.join(session_dir, 'reference.png')
+        # Build contents: prompt + optional reference images (up to 4)
+        contents = [prompt]
+        has_refs = False
+        for i, ref_file in enumerate(ref_files[:4]):
+            ref_path = os.path.join(session_dir, f'reference_{i}.png')
             ref_file.save(ref_path)
             ref_img = Image.open(ref_path)
-            contents = [prompt, ref_img]
-        else:
+            contents.append(ref_img)
+            has_refs = True
+
+        if not has_refs:
             contents = prompt
 
         response = client.models.generate_content(
@@ -339,7 +340,8 @@ def generate():
             'prompt': prompt,
             'image': filename,
             'model': model_name,
-            'has_reference': ref_file is not None,
+            'has_reference': has_refs,
+            'reference_count': len(ref_files[:4]),
             'timestamp': datetime.utcnow().isoformat(),
         }]
         _write_history(session_dir, history)
