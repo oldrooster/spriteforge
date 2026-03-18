@@ -63,7 +63,7 @@ def inpaint():
             reference_image=Image(image_bytes=mask_bytes, mime_type='image/png'),
             config=MaskReferenceConfig(
                 mask_mode='MASK_MODE_USER_PROVIDED',
-                mask_dilation=0.01,
+                mask_dilation=0.03,
             ),
         )
 
