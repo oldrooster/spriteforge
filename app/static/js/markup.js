@@ -210,8 +210,7 @@
                 inpaintMaskCanvas.width = canvas.width;
                 inpaintMaskCanvas.height = canvas.height;
                 inpaintMaskCtx = inpaintMaskCanvas.getContext('2d');
-                inpaintMaskCtx.fillStyle = '#000';
-                inpaintMaskCtx.fillRect(0, 0, canvas.width, canvas.height);
+                inpaintMaskCtx.clearRect(0, 0, canvas.width, canvas.height);
             }
             render();
         } else {
@@ -917,8 +916,7 @@
     // ── Inpaint functions ──
     function clearInpaintMask() {
         if (inpaintMaskCtx) {
-            inpaintMaskCtx.fillStyle = '#000';
-            inpaintMaskCtx.fillRect(0, 0, inpaintMaskCanvas.width, inpaintMaskCanvas.height);
+            inpaintMaskCtx.clearRect(0, 0, inpaintMaskCanvas.width, inpaintMaskCanvas.height);
             render();
         }
     }
@@ -926,9 +924,9 @@
     function isMaskEmpty() {
         if (!inpaintMaskCanvas) return true;
         var data = inpaintMaskCtx.getImageData(0, 0, inpaintMaskCanvas.width, inpaintMaskCanvas.height).data;
-        // Check if any pixel is white (mask painted)
-        for (var i = 0; i < data.length; i += 4) {
-            if (data[i] > 128) return false;
+        // Check if any pixel has been painted (non-transparent)
+        for (var i = 3; i < data.length; i += 4) {
+            if (data[i] > 0) return false;
         }
         return true;
     }
@@ -958,9 +956,16 @@
             // Flatten composite to blob
             var imageBlob = await flattenToBlob();
 
-            // Convert mask canvas to blob
+            // Build a proper black/white mask for the API (black=preserve, white=edit)
+            var apiMask = document.createElement('canvas');
+            apiMask.width = inpaintMaskCanvas.width;
+            apiMask.height = inpaintMaskCanvas.height;
+            var amCtx = apiMask.getContext('2d');
+            amCtx.fillStyle = '#000';
+            amCtx.fillRect(0, 0, apiMask.width, apiMask.height);
+            amCtx.drawImage(inpaintMaskCanvas, 0, 0);
             var maskBlob = await new Promise(function (resolve) {
-                inpaintMaskCanvas.toBlob(resolve, 'image/png');
+                apiMask.toBlob(resolve, 'image/png');
             });
 
             var fd = new FormData();
@@ -991,8 +996,7 @@
                     inpaintMaskCanvas.width = img.width;
                     inpaintMaskCanvas.height = img.height;
                     inpaintMaskCtx = inpaintMaskCanvas.getContext('2d');
-                    inpaintMaskCtx.fillStyle = '#000';
-                    inpaintMaskCtx.fillRect(0, 0, img.width, img.height);
+                    inpaintMaskCtx.clearRect(0, 0, img.width, img.height);
                 }
                 render();
                 renderLayersPanel();
