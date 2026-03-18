@@ -13,7 +13,9 @@
     var rectBtn = document.getElementById('markup-rect-btn');
     var ellipseBtn = document.getElementById('markup-ellipse-btn');
     var fillToolBtn = document.getElementById('markup-fill-btn');
-    var allToolBtns = [brushBtn, textBtn, lineBtn, arrowBtn, rectBtn, ellipseBtn, fillToolBtn];
+    var selectBtn = document.getElementById('markup-select-btn');
+    var inpaintBtn = document.getElementById('markup-inpaint-btn');
+    var allToolBtns = [brushBtn, textBtn, lineBtn, arrowBtn, rectBtn, ellipseBtn, fillToolBtn, selectBtn, inpaintBtn];
 
     // Settings panels
     var brushSettings = document.getElementById('markup-brush-settings');
@@ -21,6 +23,16 @@
     var textSettings = document.getElementById('markup-text-settings');
     var shapeSettings = document.getElementById('markup-shape-settings');
     var fillGroup = document.getElementById('markup-fill-group');
+    var inpaintSettings = document.getElementById('markup-inpaint-settings');
+
+    // Inpaint controls
+    var inpaintSizeSlider = document.getElementById('markup-inpaint-size-slider');
+    var inpaintSizeDisplay = document.getElementById('markup-inpaint-size-display');
+    var inpaintPrompt = document.getElementById('markup-inpaint-prompt');
+    var inpaintApplyBtn = document.getElementById('markup-inpaint-apply-btn');
+    var inpaintRemoveBtn = document.getElementById('markup-inpaint-remove-btn');
+    var inpaintClearMaskBtn = document.getElementById('markup-inpaint-clear-mask-btn');
+    var inpaintStatus = document.getElementById('markup-inpaint-status');
 
     // Fill tool settings
     var fillToolColor = document.getElementById('markup-fill-tool-color');
@@ -85,6 +97,9 @@
     var dragStart = null; // { x, y } for shape drawing
     var isDragging = false; // dragging a selected layer
     var dragOffset = { x: 0, y: 0 };
+    var selectState = null; // { startX, startY } while drawing a selection rectangle
+    var inpaintMaskCanvas = null; // offscreen mask canvas (white = edit, black = preserve)
+    var inpaintMaskCtx = null;
 
     // Undo/redo
     var undoStack = [];
@@ -167,6 +182,7 @@
         fillSettings.hidden = true;
         textSettings.hidden = true;
         shapeSettings.hidden = true;
+        inpaintSettings.hidden = true;
 
         if (tool === 'brush') {
             brushBtn.classList.add('active');
@@ -180,6 +196,24 @@
             textBtn.classList.add('active');
             textSettings.hidden = false;
             canvas.style.cursor = 'text';
+        } else if (tool === 'select') {
+            selectBtn.classList.add('active');
+            canvas.style.cursor = 'crosshair';
+            selectState = null;
+        } else if (tool === 'inpaint') {
+            inpaintBtn.classList.add('active');
+            inpaintSettings.hidden = false;
+            canvas.style.cursor = 'crosshair';
+            // Initialize mask canvas if needed
+            if (!inpaintMaskCanvas || inpaintMaskCanvas.width !== canvas.width || inpaintMaskCanvas.height !== canvas.height) {
+                inpaintMaskCanvas = document.createElement('canvas');
+                inpaintMaskCanvas.width = canvas.width;
+                inpaintMaskCanvas.height = canvas.height;
+                inpaintMaskCtx = inpaintMaskCanvas.getContext('2d');
+                inpaintMaskCtx.fillStyle = '#000';
+                inpaintMaskCtx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            render();
         } else {
             var btnMap = { line: lineBtn, arrow: arrowBtn, rect: rectBtn, ellipse: ellipseBtn };
             if (btnMap[tool]) btnMap[tool].classList.add('active');
@@ -197,6 +231,8 @@
     rectBtn.addEventListener('click', function () { setTool('rect'); });
     ellipseBtn.addEventListener('click', function () { setTool('ellipse'); });
     fillToolBtn.addEventListener('click', function () { setTool('fill'); });
+    selectBtn.addEventListener('click', function () { setTool('select'); });
+    inpaintBtn.addEventListener('click', function () { setTool('inpaint'); });
 
     // ── Slider displays ──
     sizeSlider.addEventListener('input', function () {
@@ -215,6 +251,10 @@
 
     fillToleranceSlider.addEventListener('input', function () {
         fillToleranceDisplay.textContent = fillToleranceSlider.value;
+    });
+
+    inpaintSizeSlider.addEventListener('input', function () {
+        inpaintSizeDisplay.textContent = inpaintSizeSlider.value;
     });
 
     fontFamilySelect.addEventListener('change', updateFontPreview);
@@ -269,8 +309,21 @@
         });
 
         // 3. Active brush stroke in progress
-        if (activeBrushCanvas && isDrawing) {
+        if (activeBrushCanvas && isDrawing && activeTool === 'brush') {
             ctx.drawImage(activeBrushCanvas, 0, 0);
+        }
+
+        // 4. Inpaint mask overlay (semi-transparent red)
+        if (activeTool === 'inpaint' && inpaintMaskCanvas) {
+            var maskOverlay = document.createElement('canvas');
+            maskOverlay.width = canvas.width;
+            maskOverlay.height = canvas.height;
+            var moCtx = maskOverlay.getContext('2d');
+            moCtx.drawImage(inpaintMaskCanvas, 0, 0);
+            moCtx.globalCompositeOperation = 'source-in';
+            moCtx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+            moCtx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(maskOverlay, 0, 0);
         }
     }
 
@@ -284,6 +337,16 @@
                 tmpCanvas.height = layer.imageData.height;
                 tmpCanvas.getContext('2d').putImageData(layer.imageData, 0, 0);
                 c.drawImage(tmpCanvas, 0, 0);
+            }
+            c.restore();
+            return;
+        } else if (layer.type === 'select') {
+            if (layer.imageData) {
+                var tmpCanvas = document.createElement('canvas');
+                tmpCanvas.width = layer.w;
+                tmpCanvas.height = layer.h;
+                tmpCanvas.getContext('2d').putImageData(layer.imageData, 0, 0);
+                c.drawImage(tmpCanvas, layer.x, layer.y);
             }
             c.restore();
             return;
@@ -366,6 +429,8 @@
         if (layer.type === 'brush') {
             // Full canvas bounds — brush strokes can't easily be bounded
             return null;
+        } else if (layer.type === 'select') {
+            return { x: layer.x, y: layer.y, w: layer.w, h: layer.h };
         } else if (layer.type === 'text') {
             var weight = layer.bold ? 'bold' : 'normal';
             var style = layer.italic ? 'italic' : 'normal';
@@ -406,6 +471,40 @@
     canvas.addEventListener('mousedown', function (e) {
         if (!originalImage) return;
         var pos = getCanvasPos(e);
+
+        if (activeTool === 'inpaint') {
+            isDrawing = true;
+            lastX = pos.x;
+            lastY = pos.y;
+            // Paint a dot on the mask canvas
+            if (inpaintMaskCtx) {
+                inpaintMaskCtx.beginPath();
+                inpaintMaskCtx.arc(lastX, lastY, parseInt(inpaintSizeSlider.value) / 2, 0, Math.PI * 2);
+                inpaintMaskCtx.fillStyle = '#fff';
+                inpaintMaskCtx.fill();
+                render();
+            }
+            return;
+        }
+
+        if (activeTool === 'select') {
+            // Check if clicking on an existing select layer to drag it
+            var hitIdx = hitTestLayers(pos.x, pos.y);
+            if (hitIdx >= 0 && layers[hitIdx].type === 'select') {
+                selectedLayerIndex = hitIdx;
+                isDragging = true;
+                dragOffset = { x: pos.x - layers[hitIdx].x, y: pos.y - layers[hitIdx].y };
+                render();
+                renderLayersPanel();
+            } else {
+                // Start drawing a new selection rectangle
+                selectState = { startX: pos.x, startY: pos.y };
+                selectedLayerIndex = -1;
+                render();
+                renderLayersPanel();
+            }
+            return;
+        }
 
         if (activeTool === 'fill') {
             floodFillAt(pos.x, pos.y);
@@ -483,6 +582,38 @@
         if (!originalImage) return;
         var pos = getCanvasPos(e);
 
+        if (activeTool === 'inpaint' && isDrawing && inpaintMaskCtx) {
+            inpaintMaskCtx.beginPath();
+            inpaintMaskCtx.moveTo(lastX, lastY);
+            inpaintMaskCtx.lineTo(pos.x, pos.y);
+            inpaintMaskCtx.strokeStyle = '#fff';
+            inpaintMaskCtx.lineWidth = parseInt(inpaintSizeSlider.value);
+            inpaintMaskCtx.lineCap = 'round';
+            inpaintMaskCtx.lineJoin = 'round';
+            inpaintMaskCtx.stroke();
+            lastX = pos.x;
+            lastY = pos.y;
+            render();
+            return;
+        }
+
+        if (activeTool === 'select' && selectState) {
+            // Preview selection rectangle
+            render();
+            var sx = Math.min(selectState.startX, pos.x);
+            var sy = Math.min(selectState.startY, pos.y);
+            var sw = Math.abs(pos.x - selectState.startX);
+            var sh = Math.abs(pos.y - selectState.startY);
+            ctx.save();
+            ctx.strokeStyle = '#00bfff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.strokeRect(sx, sy, sw, sh);
+            ctx.setLineDash([]);
+            ctx.restore();
+            return;
+        }
+
         if (activeTool === 'brush' && isDrawing) {
             activeBrushCtx.beginPath();
             activeBrushCtx.moveTo(lastX, lastY);
@@ -506,6 +637,9 @@
             } else if (layer.type === 'ellipse') {
                 layer.cx = pos.x - dragOffset.x;
                 layer.cy = pos.y - dragOffset.y;
+            } else if (layer.type === 'select') {
+                layer.x = pos.x - dragOffset.x;
+                layer.y = pos.y - dragOffset.y;
             } else if (layer.type === 'line' || layer.type === 'arrow') {
                 var dx = pos.x - dragOffset.x - layer.x1;
                 var dy = pos.y - dragOffset.y - layer.y1;
@@ -527,16 +661,20 @@
     window.addEventListener('mouseup', function () {
         if (isDrawing) {
             isDrawing = false;
-            // Save brush stroke as a layer
-            if (activeBrushCtx) {
-                var strokeData = activeBrushCtx.getImageData(0, 0, activeBrushCanvas.width, activeBrushCanvas.height);
-                layers.push({ type: 'brush', imageData: strokeData });
-                selectedLayerIndex = layers.length - 1;
-                activeBrushCtx.clearRect(0, 0, activeBrushCanvas.width, activeBrushCanvas.height);
-                render();
-                renderLayersPanel();
+            if (activeTool === 'inpaint') {
+                // Mask painting done — no layer or undo needed
+            } else {
+                // Save brush stroke as a layer
+                if (activeBrushCtx) {
+                    var strokeData = activeBrushCtx.getImageData(0, 0, activeBrushCanvas.width, activeBrushCanvas.height);
+                    layers.push({ type: 'brush', imageData: strokeData });
+                    selectedLayerIndex = layers.length - 1;
+                    activeBrushCtx.clearRect(0, 0, activeBrushCanvas.width, activeBrushCanvas.height);
+                    render();
+                    renderLayersPanel();
+                }
+                pushUndo();
             }
-            pushUndo();
         }
         if (isDragging) {
             isDragging = false;
@@ -555,6 +693,107 @@
     });
 
     canvas.addEventListener('mouseup', function (e) {
+        // Handle select tool completion
+        if (activeTool === 'select' && selectState) {
+            var pos = getCanvasPos(e);
+            var sx = Math.round(Math.min(selectState.startX, pos.x));
+            var sy = Math.round(Math.min(selectState.startY, pos.y));
+            var sw = Math.round(Math.abs(pos.x - selectState.startX));
+            var sh = Math.round(Math.abs(pos.y - selectState.startY));
+            selectState = null;
+
+            // Minimum size threshold
+            if (sw < 4 || sh < 4) { render(); return; }
+
+            // Clamp to canvas bounds
+            if (sx < 0) { sw += sx; sx = 0; }
+            if (sy < 0) { sh += sy; sy = 0; }
+            if (sx + sw > canvas.width) sw = canvas.width - sx;
+            if (sy + sh > canvas.height) sh = canvas.height - sy;
+            if (sw <= 0 || sh <= 0) { render(); return; }
+
+            // 1. Flatten entire composite to extract the selected region
+            var compositeCanvas = document.createElement('canvas');
+            compositeCanvas.width = canvas.width;
+            compositeCanvas.height = canvas.height;
+            var compositeCtx = compositeCanvas.getContext('2d');
+            compositeCtx.drawImage(originalImage, 0, 0);
+            layers.forEach(function (layer) { drawLayer(compositeCtx, layer); });
+            var selectedPixels = compositeCtx.getImageData(sx, sy, sw, sh);
+
+            // 2. Punch a hole in the original image
+            var newOrigCanvas = document.createElement('canvas');
+            newOrigCanvas.width = originalImage.width || canvas.width;
+            newOrigCanvas.height = originalImage.height || canvas.height;
+            var newOrigCtx = newOrigCanvas.getContext('2d');
+            newOrigCtx.drawImage(originalImage, 0, 0);
+            newOrigCtx.clearRect(sx, sy, sw, sh);
+            var newImg = new Image();
+            newImg.onload = function () {
+                originalImage = newImg;
+
+                // 3. Clear the selected rect from all existing brush/select layers
+                for (var i = layers.length - 1; i >= 0; i--) {
+                    var layer = layers[i];
+                    if (layer.type === 'brush' || layer.type === 'select') {
+                        // Clear the region in the layer's ImageData
+                        var id = layer.imageData;
+                        var data = id.data;
+                        var imgW = id.width;
+                        // Determine the region to clear within this layer's pixel data
+                        var clearX, clearY;
+                        if (layer.type === 'select') {
+                            // select layers have an offset
+                            clearX = sx - Math.round(layer.x);
+                            clearY = sy - Math.round(layer.y);
+                        } else {
+                            clearX = sx;
+                            clearY = sy;
+                        }
+                        for (var py = 0; py < sh; py++) {
+                            for (var px = 0; px < sw; px++) {
+                                var lx = clearX + px;
+                                var ly = clearY + py;
+                                if (lx >= 0 && lx < (layer.type === 'select' ? layer.w : imgW) &&
+                                    ly >= 0 && ly < (layer.type === 'select' ? layer.h : id.height)) {
+                                    var idx = ((ly) * imgW + lx) * 4;
+                                    if (layer.type === 'select') {
+                                        idx = (ly * layer.w + lx) * 4;
+                                    }
+                                    data[idx + 3] = 0; // Set alpha to 0
+                                }
+                            }
+                        }
+                    } else if (layer.type !== 'brush') {
+                        // For vector layers, check if they're fully inside the selection
+                        var bounds = getLayerBounds(layer);
+                        if (bounds && bounds.x >= sx && bounds.y >= sy &&
+                            bounds.x + bounds.w <= sx + sw && bounds.y + bounds.h <= sy + sh) {
+                            layers.splice(i, 1);
+                            if (selectedLayerIndex === i) selectedLayerIndex = -1;
+                            else if (selectedLayerIndex > i) selectedLayerIndex--;
+                        }
+                    }
+                }
+
+                // 4. Create the new select layer
+                layers.push({
+                    type: 'select',
+                    imageData: selectedPixels,
+                    x: sx,
+                    y: sy,
+                    w: sw,
+                    h: sh,
+                });
+                selectedLayerIndex = layers.length - 1;
+                render();
+                renderLayersPanel();
+                pushUndo();
+            };
+            newImg.src = newOrigCanvas.toDataURL();
+            return;
+        }
+
         if (dragStart && activeTool !== 'brush' && activeTool !== 'text') {
             var pos = getCanvasPos(e);
             var dx = Math.abs(pos.x - dragStart.x);
@@ -675,6 +914,106 @@
         return null;
     }
 
+    // ── Inpaint functions ──
+    function clearInpaintMask() {
+        if (inpaintMaskCtx) {
+            inpaintMaskCtx.fillStyle = '#000';
+            inpaintMaskCtx.fillRect(0, 0, inpaintMaskCanvas.width, inpaintMaskCanvas.height);
+            render();
+        }
+    }
+
+    function isMaskEmpty() {
+        if (!inpaintMaskCanvas) return true;
+        var data = inpaintMaskCtx.getImageData(0, 0, inpaintMaskCanvas.width, inpaintMaskCanvas.height).data;
+        // Check if any pixel is white (mask painted)
+        for (var i = 0; i < data.length; i += 4) {
+            if (data[i] > 128) return false;
+        }
+        return true;
+    }
+
+    async function doInpaint(mode) {
+        if (!originalImage) return;
+
+        if (isMaskEmpty()) {
+            inpaintStatus.textContent = 'Paint a mask area first.';
+            inpaintStatus.hidden = false;
+            return;
+        }
+
+        var prompt = inpaintPrompt.value.trim();
+        if (mode === 'insert' && !prompt) {
+            inpaintStatus.textContent = 'Enter a prompt for editing.';
+            inpaintStatus.hidden = false;
+            return;
+        }
+
+        inpaintApplyBtn.disabled = true;
+        inpaintRemoveBtn.disabled = true;
+        inpaintStatus.textContent = 'Inpainting... this may take a moment.';
+        inpaintStatus.hidden = false;
+
+        try {
+            // Flatten composite to blob
+            var imageBlob = await flattenToBlob();
+
+            // Convert mask canvas to blob
+            var maskBlob = await new Promise(function (resolve) {
+                inpaintMaskCanvas.toBlob(resolve, 'image/png');
+            });
+
+            var fd = new FormData();
+            fd.append('image', imageBlob, 'source.png');
+            fd.append('mask', maskBlob, 'mask.png');
+            fd.append('prompt', prompt);
+            fd.append('mode', mode);
+
+            var resp = await fetch('/api/ai-inpaint', { method: 'POST', body: fd });
+
+            if (!resp.ok) {
+                var errData = await resp.json();
+                throw new Error(errData.error || 'Inpaint failed');
+            }
+
+            var resultBlob = await resp.blob();
+            var img = new Image();
+            img.onload = function () {
+                // Replace the canvas with the inpainted result
+                originalImage = img;
+                canvas.width = img.width;
+                canvas.height = img.height;
+                layers = [];
+                selectedLayerIndex = -1;
+                clearInpaintMask();
+                // Re-init mask canvas to new dimensions
+                if (inpaintMaskCanvas) {
+                    inpaintMaskCanvas.width = img.width;
+                    inpaintMaskCanvas.height = img.height;
+                    inpaintMaskCtx = inpaintMaskCanvas.getContext('2d');
+                    inpaintMaskCtx.fillStyle = '#000';
+                    inpaintMaskCtx.fillRect(0, 0, img.width, img.height);
+                }
+                render();
+                renderLayersPanel();
+                pushUndo();
+                inpaintStatus.textContent = 'Inpaint complete!';
+                setTimeout(function () { inpaintStatus.hidden = true; }, 3000);
+            };
+            img.src = URL.createObjectURL(resultBlob);
+
+        } catch (err) {
+            inpaintStatus.textContent = 'Error: ' + err.message;
+        } finally {
+            inpaintApplyBtn.disabled = false;
+            inpaintRemoveBtn.disabled = false;
+        }
+    }
+
+    inpaintApplyBtn.addEventListener('click', function () { doInpaint('insert'); });
+    inpaintRemoveBtn.addEventListener('click', function () { doInpaint('remove'); });
+    inpaintClearMaskBtn.addEventListener('click', clearInpaintMask);
+
     // ── Delete key removes selected layer ──
     document.addEventListener('keydown', function (e) {
         if (!toolPanel.classList.contains('active')) return;
@@ -708,6 +1047,8 @@
             label.className = 'markup-layer-label';
             if (layer.type === 'brush') {
                 label.textContent = 'Brush Stroke';
+            } else if (layer.type === 'select') {
+                label.textContent = 'Selection';
             } else if (layer.type === 'text') {
                 label.textContent = 'T: ' + (layer.text.length > 15 ? layer.text.substring(0, 15) + '...' : layer.text);
             } else {
@@ -793,13 +1134,28 @@
                 var newData = new ImageData(new Uint8ClampedArray(id.data), id.width, id.height);
                 return { type: 'brush', imageData: newData };
             }
+            if (layer.type === 'select') {
+                var id = layer.imageData;
+                var newData = new ImageData(new Uint8ClampedArray(id.data), id.width, id.height);
+                return { type: 'select', imageData: newData, x: layer.x, y: layer.y, w: layer.w, h: layer.h };
+            }
             return JSON.parse(JSON.stringify(layer));
         });
+    }
+
+    function cloneOriginalImage() {
+        if (!originalImage) return null;
+        var c = document.createElement('canvas');
+        c.width = originalImage.width || canvas.width;
+        c.height = originalImage.height || canvas.height;
+        c.getContext('2d').drawImage(originalImage, 0, 0);
+        return c;
     }
 
     function pushUndo() {
         undoStack.push({
             layers: deepCopyLayers(layers),
+            origCanvas: cloneOriginalImage(),
         });
         if (undoStack.length > MAX_UNDO) undoStack.shift();
         redoStack = [];
@@ -809,7 +1165,16 @@
     function restoreSnapshot(snapshot) {
         layers = deepCopyLayers(snapshot.layers);
         selectedLayerIndex = -1;
-        render();
+        if (snapshot.origCanvas) {
+            var img = new Image();
+            img.onload = function () {
+                originalImage = img;
+                render();
+            };
+            img.src = snapshot.origCanvas.toDataURL();
+        } else {
+            render();
+        }
         renderLayersPanel();
     }
 

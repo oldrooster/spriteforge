@@ -921,6 +921,8 @@
                                 <button id="markup-rect-btn" class="btn btn-secondary btn-small" title="Rectangle">Rect</button>
                                 <button id="markup-ellipse-btn" class="btn btn-secondary btn-small" title="Ellipse">Ellipse</button>
                                 <button id="markup-fill-btn" class="btn btn-secondary btn-small" title="Fill (paint bucket)">Fill</button>
+                                <button id="markup-select-btn" class="btn btn-secondary btn-small" title="Select & Move">Select</button>
+                                <button id="markup-inpaint-btn" class="btn btn-secondary btn-small" title="AI Inpaint">Inpaint</button>
                             </div>
                         </div>
                         <!-- Brush settings -->
@@ -985,6 +987,23 @@
                                 <label><input type="checkbox" id="markup-fill-check"> Fill</label>
                                 <input type="color" id="markup-fill-color" value="#ff000040" style="margin-top:4px;">
                             </div>
+                        </div>
+                        <!-- Inpaint settings -->
+                        <div id="markup-inpaint-settings" hidden>
+                            <div class="setting-group">
+                                <label>Mask Brush Size: <span id="markup-inpaint-size-display">20</span>px</label>
+                                <input type="range" id="markup-inpaint-size-slider" min="5" max="100" value="20" class="styled-range">
+                            </div>
+                            <div class="setting-group">
+                                <label>Prompt <span class="hint">(leave empty to remove)</span></label>
+                                <input type="text" id="markup-inpaint-prompt" class="styled-input" placeholder="e.g. add sunglasses">
+                            </div>
+                            <div class="setting-group">
+                                <button id="markup-inpaint-apply-btn" class="btn btn-primary btn-small" style="width:100%">Inpaint (Edit)</button>
+                                <button id="markup-inpaint-remove-btn" class="btn btn-accent btn-small" style="width:100%; margin-top:6px;">Remove</button>
+                                <button id="markup-inpaint-clear-mask-btn" class="btn btn-secondary btn-small" style="width:100%; margin-top:6px;">Clear Mask</button>
+                            </div>
+                            <div id="markup-inpaint-status" class="hint" style="padding:4px 0;text-align:center;font-size:12px;" hidden></div>
                         </div>
                         <hr>
                         <!-- Layers panel -->

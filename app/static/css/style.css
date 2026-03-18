@@ -1164,6 +1164,21 @@ hr {
     border-color: var(--accent);
 }
 
+.styled-input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.styled-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
 /* Sprite Library */
 .library-header {
     display: flex;
