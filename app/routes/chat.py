@@ -4,6 +4,8 @@ import uuid
 
 from flask import Blueprint, request, jsonify, current_app
 
+from app.services.ai_client import get_client
+
 chat_bp = Blueprint('chat', __name__)
 
 CHAT_MODEL = 'gemini-2.5-flash'
@@ -54,26 +56,6 @@ Question flow:
 Do NOT use markdown formatting. Use plain text only."""
 
 
-def _get_client():
-    from google import genai
-
-    gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-    gcp_location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'global').strip()
-    api_key = os.environ.get('GEMINI_API_KEY', '').strip()
-
-    if gcp_project:
-        client = genai.Client(vertexai=True, project=gcp_project, location=gcp_location)
-        return client, None
-
-    if api_key:
-        client = genai.Client(api_key=api_key)
-        return client, None
-
-    return None, (jsonify({
-        'error': 'No AI backend configured. Set GOOGLE_CLOUD_PROJECT (for Vertex AI) '
-                 'or GEMINI_API_KEY (for AI Studio) in docker-compose.yml.'
-    }), 500)
-
 
 def _session_dir(session_id):
     out = os.path.join(current_app.config['OUTPUT_FOLDER'], 'chat', session_id)
@@ -106,7 +88,7 @@ def chat():
     if not message and mode != 'interview':
         return jsonify({'error': 'Message is required'}), 400
 
-    client, err = _get_client()
+    client, err = get_client(location='global')
     if err:
         return err
 

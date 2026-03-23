@@ -921,6 +921,7 @@
                                 <button id="markup-rect-btn" class="btn btn-secondary btn-small" title="Rectangle">Rect</button>
                                 <button id="markup-ellipse-btn" class="btn btn-secondary btn-small" title="Ellipse">Ellipse</button>
                                 <button id="markup-fill-btn" class="btn btn-secondary btn-small" title="Fill (paint bucket)">Fill</button>
+                                <button id="markup-eyedropper-btn" class="btn btn-secondary btn-small" title="Color Picker">Picker</button>
                                 <button id="markup-select-btn" class="btn btn-secondary btn-small" title="Select & Move">Select</button>
                                 <button id="markup-inpaint-btn" class="btn btn-secondary btn-small" title="AI Inpaint">Inpaint</button>
                             </div>
@@ -986,6 +987,17 @@
                             <div class="setting-group" id="markup-fill-group">
                                 <label><input type="checkbox" id="markup-fill-check"> Fill</label>
                                 <input type="color" id="markup-fill-color" value="#ff000040" style="margin-top:4px;">
+                            </div>
+                        </div>
+                        <!-- Select settings -->
+                        <div id="markup-select-settings" hidden>
+                            <div class="setting-group">
+                                <button id="markup-select-all-btn" class="btn btn-secondary btn-small" style="width:100%">Select All</button>
+                            </div>
+                            <div id="markup-select-actions" class="setting-group" hidden>
+                                <button id="markup-select-move-btn" class="btn btn-primary btn-small" style="width:100%">Move</button>
+                                <button id="markup-select-delete-btn" class="btn btn-accent btn-small" style="width:100%; margin-top:6px;">Delete</button>
+                                <button id="markup-select-cancel-btn" class="btn btn-secondary btn-small" style="width:100%; margin-top:6px;">Cancel</button>
                             </div>
                         </div>
                         <!-- Inpaint settings -->

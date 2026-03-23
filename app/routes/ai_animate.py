@@ -8,13 +8,11 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify, send_from_directory, current_app
 
+from app.services.ai_client import get_vertex_config, get_credentials
+
 ai_animate_bp = Blueprint('ai_animate', __name__)
 
-MODELS_AI_STUDIO = [
-    {'id': 'veo-2.0-generate-001', 'name': 'Veo 2.0 (Standard)', 'default': True},
-]
-
-MODELS_VERTEX_AI = [
+MODELS = [
     {'id': 'veo-3.1-fast-generate-001', 'name': 'Veo 3.1 Fast - ~$0.15/sec', 'default': True},
     {'id': 'veo-3.1-generate-001', 'name': 'Veo 3.1 (Latest) - ~$0.40/sec', 'default': False},
     {'id': 'veo-3.1-generate-preview', 'name': 'Veo 3.1 Preview - ~$0.40/sec', 'default': False},
@@ -26,31 +24,6 @@ MODELS_VERTEX_AI = [
     {'id': 'veo-2.0-generate-001', 'name': 'Veo 2.0 - ~$0.50/sec', 'default': False},
     {'id': 'veo-2.0-generate-exp', 'name': 'Veo 2.0 Experimental - ~$0.50/sec', 'default': False},
 ]
-
-
-def _is_vertex():
-    return bool(os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip())
-
-
-def _get_client():
-    from google import genai
-
-    gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-    gcp_location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'us-central1').strip()
-    api_key = os.environ.get('GEMINI_API_KEY', '').strip()
-
-    if gcp_project:
-        client = genai.Client(vertexai=True, project=gcp_project, location=gcp_location)
-        return client, None
-
-    if api_key:
-        client = genai.Client(api_key=api_key)
-        return client, None
-
-    return None, (jsonify({
-        'error': 'No AI backend configured. Set GOOGLE_CLOUD_PROJECT (for Vertex AI) '
-                 'or GEMINI_API_KEY (for AI Studio) in docker-compose.yml.'
-    }), 500)
 
 
 
@@ -75,63 +48,6 @@ def _write_status(session_dir, status_data):
         json.dump(status_data, f, indent=2)
     os.replace(tmp, path)
 
-
-def _run_video_generation_ai_studio(session_dir, image_path, prompt, model_name, api_key, generate_audio=False, duration=4, end_image_path=None):
-    """Background worker for AI Studio (Gemini Developer API)."""
-    import time
-    try:
-        from google import genai
-        from google.genai import types
-
-        client = genai.Client(api_key=api_key)
-        source_image = client.files.upload(file=image_path)
-
-        config_kwargs = {
-            'person_generation': 'allow_all',
-            'aspect_ratio': '16:9',
-            'duration_seconds': duration,
-        }
-        if not generate_audio:
-            config_kwargs['generate_audio'] = False
-
-        # Add last frame if provided
-        if end_image_path and os.path.exists(end_image_path):
-            last_frame = client.files.upload(file=end_image_path)
-            config_kwargs['last_frame'] = last_frame
-
-        operation = client.models.generate_videos(
-            model=model_name,
-            image=source_image,
-            config=types.GenerateVideosConfig(**config_kwargs),
-        )
-
-        while not operation.done:
-            time.sleep(15)
-            operation = client.operations.get(operation)
-
-        if not operation.response or not operation.response.generated_videos:
-            _write_status(session_dir, {
-                'status': 'failed',
-                'error': 'No video was generated. Try a different prompt.',
-            })
-            return
-
-        video = operation.response.generated_videos[0]
-        video_data = client.files.download(file=video.video)
-        video_path = os.path.join(session_dir, 'output.mp4')
-        with open(video_path, 'wb') as f:
-            f.write(video_data)
-
-        _write_status(session_dir, {
-            'status': 'completed',
-            'video_file': 'output.mp4',
-        })
-
-    except Exception as e:
-        _write_status(session_dir, {
-            'status': 'failed',
-            'error': str(e),
-        })
 
 
 def _summarize_keys(obj, depth=0, max_depth=4):
@@ -204,16 +120,9 @@ def _run_video_generation_vertex(session_dir, image_path, prompt, model_name, pr
     """Background worker for Vertex AI using the REST API."""
     import time
     import base64
-    import google.auth
-    import google.auth.transport.requests
 
     try:
-        # Get access token from ADC with Vertex AI scope
-        credentials, _ = google.auth.default(
-            scopes=['https://www.googleapis.com/auth/cloud-platform']
-        )
-        auth_req = google.auth.transport.requests.Request()
-        credentials.refresh(auth_req)
+        credentials, auth_req = get_credentials()
         access_token = credentials.token
 
         # Read and base64-encode the source image
@@ -342,21 +251,19 @@ def _run_video_generation_vertex(session_dir, image_path, prompt, model_name, pr
 
 @ai_animate_bp.route('/ai-animate/models', methods=['GET'])
 def list_models():
-    models = MODELS_VERTEX_AI if _is_vertex() else MODELS_AI_STUDIO
-    return jsonify({'models': models, 'backend': 'vertex_ai' if _is_vertex() else 'ai_studio'})
+    return jsonify({'models': MODELS})
 
 
 @ai_animate_bp.route('/ai-animate', methods=['POST'])
 def animate():
-    client, err = _get_client()
+    cfg, err = get_vertex_config(location_env='GOOGLE_CLOUD_VIDEO_LOCATION')
     if err:
         return err
 
     # Accept both FormData (with file uploads) and JSON
     if request.content_type and 'multipart/form-data' in request.content_type:
         prompt = (request.form.get('prompt') or '').strip()
-        default_model = 'veo-3.1-fast-generate-001' if _is_vertex() else 'veo-2.0-generate-001'
-        model_name = request.form.get('model', default_model)
+        model_name = request.form.get('model', 'veo-3.1-fast-generate-001')
         asset_id = request.form.get('asset_id')
         view_id = request.form.get('view_id', '').strip() or None
         resource_id = request.form.get('resource_id', '').strip() or None
@@ -368,8 +275,7 @@ def animate():
     else:
         data = request.get_json(force=True)
         prompt = data.get('prompt', '').strip()
-        default_model = 'veo-3.1-fast-generate-001' if _is_vertex() else 'veo-2.0-generate-001'
-        model_name = data.get('model', default_model)
+        model_name = data.get('model', 'veo-3.1-fast-generate-001')
         asset_id = data.get('asset_id')
         view_id = data.get('view_id')
         resource_id = data.get('resource_id')
@@ -423,21 +329,11 @@ def animate():
         'started': datetime.now(timezone.utc).isoformat(),
     })
 
-    if _is_vertex():
-        gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-        gcp_location = os.environ.get('GOOGLE_CLOUD_VIDEO_LOCATION', 'us-central1').strip()
-        thread = threading.Thread(
-            target=_run_video_generation_vertex,
-            args=(session_dir, image_path, prompt, model_name, gcp_project, gcp_location, generate_audio, duration, end_image_path),
-            daemon=True,
-        )
-    else:
-        api_key = os.environ.get('GEMINI_API_KEY', '').strip()
-        thread = threading.Thread(
-            target=_run_video_generation_ai_studio,
-            args=(session_dir, image_path, prompt, model_name, api_key, generate_audio, duration, end_image_path),
-            daemon=True,
-        )
+    thread = threading.Thread(
+        target=_run_video_generation_vertex,
+        args=(session_dir, image_path, prompt, model_name, cfg['project'], cfg['location'], generate_audio, duration, end_image_path),
+        daemon=True,
+    )
     thread.start()
 
     return jsonify({

@@ -1,25 +1,8 @@
-import os
-
 from flask import Blueprint, request, jsonify, Response
 
+from app.services.ai_client import get_client
+
 ai_inpaint_bp = Blueprint('ai_inpaint', __name__)
-
-
-def _get_inpaint_client():
-    """Get a google-genai client configured for Imagen inpainting."""
-    from google import genai
-
-    gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-    gcp_location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'us-central1').strip()
-
-    if not gcp_project:
-        return None, (jsonify({
-            'error': 'AI Inpaint requires Vertex AI. Set GOOGLE_CLOUD_PROJECT in docker-compose.yml.'
-        }), 500)
-
-    # imagen-3.0-capability-001 is not a global-only model
-    client = genai.Client(vertexai=True, project=gcp_project, location=gcp_location)
-    return client, None
 
 
 @ai_inpaint_bp.route('/ai-inpaint', methods=['POST'])
@@ -38,7 +21,7 @@ def inpaint():
     if mode == 'insert' and not prompt:
         return jsonify({'error': 'Prompt is required for inpaint editing'}), 400
 
-    client, err = _get_inpaint_client()
+    client, err = get_client()
     if err:
         return err
 

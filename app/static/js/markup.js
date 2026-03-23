@@ -13,9 +13,10 @@
     var rectBtn = document.getElementById('markup-rect-btn');
     var ellipseBtn = document.getElementById('markup-ellipse-btn');
     var fillToolBtn = document.getElementById('markup-fill-btn');
+    var eyedropperBtn = document.getElementById('markup-eyedropper-btn');
     var selectBtn = document.getElementById('markup-select-btn');
     var inpaintBtn = document.getElementById('markup-inpaint-btn');
-    var allToolBtns = [brushBtn, textBtn, lineBtn, arrowBtn, rectBtn, ellipseBtn, fillToolBtn, selectBtn, inpaintBtn];
+    var allToolBtns = [brushBtn, textBtn, lineBtn, arrowBtn, rectBtn, ellipseBtn, fillToolBtn, eyedropperBtn, selectBtn, inpaintBtn];
 
     // Settings panels
     var brushSettings = document.getElementById('markup-brush-settings');
@@ -24,6 +25,12 @@
     var shapeSettings = document.getElementById('markup-shape-settings');
     var fillGroup = document.getElementById('markup-fill-group');
     var inpaintSettings = document.getElementById('markup-inpaint-settings');
+    var selectSettings = document.getElementById('markup-select-settings');
+    var selectAllBtn = document.getElementById('markup-select-all-btn');
+    var selectActions = document.getElementById('markup-select-actions');
+    var selectMoveBtn = document.getElementById('markup-select-move-btn');
+    var selectDeleteBtn = document.getElementById('markup-select-delete-btn');
+    var selectCancelBtn = document.getElementById('markup-select-cancel-btn');
 
     // Inpaint controls
     var inpaintSizeSlider = document.getElementById('markup-inpaint-size-slider');
@@ -87,6 +94,9 @@
     var activeBrushCanvas = null;
     var activeBrushCtx = null;
 
+    // Eyedropper state
+    var previousTool = 'brush'; // tool to return to after eyedropper pick
+
     // Layers array
     var layers = [];
     var selectedLayerIndex = -1;
@@ -98,6 +108,9 @@
     var isDragging = false; // dragging a selected layer
     var dragOffset = { x: 0, y: 0 };
     var selectState = null; // { startX, startY } while drawing a selection rectangle
+    var pendingSelect = null; // { x, y, w, h } — confirmed selection area awaiting action
+    var resizeHandle = null; // which handle is being dragged: 'nw','n','ne','e','se','s','sw','w'
+    var resizeStart = null; // { x, y, bounds: {x,y,w,h} } snapshot at drag start
     var inpaintMaskCanvas = null; // offscreen mask canvas (white = edit, black = preserve)
     var inpaintMaskCtx = null;
 
@@ -175,6 +188,7 @@
 
     // ── Tool switching ──
     function setTool(tool) {
+        if (tool !== 'eyedropper') previousTool = activeTool || 'brush';
         activeTool = tool;
         allToolBtns.forEach(function (btn) { btn.classList.remove('active'); });
 
@@ -183,6 +197,9 @@
         textSettings.hidden = true;
         shapeSettings.hidden = true;
         inpaintSettings.hidden = true;
+        selectSettings.hidden = true;
+        pendingSelect = null;
+        selectActions.hidden = true;
 
         if (tool === 'brush') {
             brushBtn.classList.add('active');
@@ -196,8 +213,12 @@
             textBtn.classList.add('active');
             textSettings.hidden = false;
             canvas.style.cursor = 'text';
+        } else if (tool === 'eyedropper') {
+            eyedropperBtn.classList.add('active');
+            canvas.style.cursor = 'crosshair';
         } else if (tool === 'select') {
             selectBtn.classList.add('active');
+            selectSettings.hidden = false;
             canvas.style.cursor = 'crosshair';
             selectState = null;
         } else if (tool === 'inpaint') {
@@ -230,7 +251,28 @@
     rectBtn.addEventListener('click', function () { setTool('rect'); });
     ellipseBtn.addEventListener('click', function () { setTool('ellipse'); });
     fillToolBtn.addEventListener('click', function () { setTool('fill'); });
+    eyedropperBtn.addEventListener('click', function () { setTool('eyedropper'); });
     selectBtn.addEventListener('click', function () { setTool('select'); });
+    selectAllBtn.addEventListener('click', function () {
+        if (!originalImage) return;
+        setTool('select');
+        setPendingSelect(0, 0, canvas.width, canvas.height);
+    });
+    selectMoveBtn.addEventListener('click', function () {
+        if (!pendingSelect || !originalImage) return;
+        var p = pendingSelect;
+        clearPendingSelect();
+        performSelection(p.x, p.y, p.w, p.h);
+    });
+    selectDeleteBtn.addEventListener('click', function () {
+        if (!pendingSelect || !originalImage) return;
+        var p = pendingSelect;
+        clearPendingSelect();
+        deleteSelection(p.x, p.y, p.w, p.h);
+    });
+    selectCancelBtn.addEventListener('click', function () {
+        clearPendingSelect();
+    });
     inpaintBtn.addEventListener('click', function () { setTool('inpaint'); });
 
     // ── Slider displays ──
@@ -324,6 +366,37 @@
             moCtx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(maskOverlay, 0, 0);
         }
+
+        // 5. Pending selection rectangle with handles
+        if (pendingSelect) {
+            var ps = pendingSelect;
+            ctx.save();
+            // Dim area outside selection
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.fillRect(0, 0, canvas.width, ps.y); // top
+            ctx.fillRect(0, ps.y, ps.x, ps.h); // left
+            ctx.fillRect(ps.x + ps.w, ps.y, canvas.width - ps.x - ps.w, ps.h); // right
+            ctx.fillRect(0, ps.y + ps.h, canvas.width, canvas.height - ps.y - ps.h); // bottom
+            // Dashed border
+            ctx.strokeStyle = '#00bfff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.strokeRect(ps.x, ps.y, ps.w, ps.h);
+            ctx.setLineDash([]);
+            // Resize handles
+            var hs = HANDLE_SIZE;
+            var hh = hs / 2;
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#00bfff';
+            ctx.lineWidth = 1.5;
+            var handles = getResizeHandlePositions(ps);
+            for (var key in handles) {
+                var h = handles[key];
+                ctx.fillRect(h.x - hh, h.y - hh, hs, hs);
+                ctx.strokeRect(h.x - hh, h.y - hh, hs, hs);
+            }
+            ctx.restore();
+        }
     }
 
     function drawLayer(c, layer) {
@@ -342,10 +415,11 @@
         } else if (layer.type === 'select') {
             if (layer.imageData) {
                 var tmpCanvas = document.createElement('canvas');
-                tmpCanvas.width = layer.w;
-                tmpCanvas.height = layer.h;
+                tmpCanvas.width = layer.imageData.width;
+                tmpCanvas.height = layer.imageData.height;
                 tmpCanvas.getContext('2d').putImageData(layer.imageData, 0, 0);
-                c.drawImage(tmpCanvas, layer.x, layer.y);
+                c.drawImage(tmpCanvas, 0, 0, tmpCanvas.width, tmpCanvas.height,
+                    layer.x, layer.y, layer.w, layer.h);
             }
             c.restore();
             return;
@@ -411,6 +485,7 @@
         c.fill();
     }
 
+    var HANDLE_SIZE = 8;
     function drawSelectionHandles(c, layer) {
         var bounds = getLayerBounds(layer);
         if (!bounds) return;
@@ -422,6 +497,34 @@
         c.strokeRect(bounds.x - 4, bounds.y - 4, bounds.w + 8, bounds.h + 8);
         c.setLineDash([]);
         c.restore();
+    }
+
+    function getResizeHandlePositions(bounds) {
+        var mx = bounds.x + bounds.w / 2;
+        var my = bounds.y + bounds.h / 2;
+        return {
+            nw: { x: bounds.x, y: bounds.y },
+            n:  { x: mx, y: bounds.y },
+            ne: { x: bounds.x + bounds.w, y: bounds.y },
+            e:  { x: bounds.x + bounds.w, y: my },
+            se: { x: bounds.x + bounds.w, y: bounds.y + bounds.h },
+            s:  { x: mx, y: bounds.y + bounds.h },
+            sw: { x: bounds.x, y: bounds.y + bounds.h },
+            w:  { x: bounds.x, y: my },
+        };
+    }
+
+    function hitTestResizeHandles(px, py) {
+        if (!pendingSelect) return null;
+        var handles = getResizeHandlePositions(pendingSelect);
+        var threshold = HANDLE_SIZE;
+        for (var key in handles) {
+            var h = handles[key];
+            if (Math.abs(px - h.x) <= threshold && Math.abs(py - h.y) <= threshold) {
+                return key;
+            }
+        }
+        return null;
     }
 
     function getLayerBounds(layer) {
@@ -450,6 +553,154 @@
             return { x: layer.cx - Math.abs(layer.rx), y: layer.cy - Math.abs(layer.ry), w: Math.abs(layer.rx) * 2, h: Math.abs(layer.ry) * 2 };
         }
         return null;
+    }
+
+    // ── Pending selection helpers ──
+    function setPendingSelect(x, y, w, h) {
+        pendingSelect = { x: x, y: y, w: w, h: h };
+        selectActions.hidden = false;
+        render();
+    }
+
+    function clearPendingSelect() {
+        pendingSelect = null;
+        selectActions.hidden = true;
+        render();
+    }
+
+    function deleteSelection(sx, sy, sw, sh) {
+        // Punch a hole in the original image and layers without creating a select layer
+        var newOrigCanvas = document.createElement('canvas');
+        newOrigCanvas.width = originalImage.width || canvas.width;
+        newOrigCanvas.height = originalImage.height || canvas.height;
+        var newOrigCtx = newOrigCanvas.getContext('2d');
+        newOrigCtx.drawImage(originalImage, 0, 0);
+        newOrigCtx.clearRect(sx, sy, sw, sh);
+        var newImg = new Image();
+        newImg.onload = function () {
+            originalImage = newImg;
+            // Clear from existing layers
+            for (var i = layers.length - 1; i >= 0; i--) {
+                var layer = layers[i];
+                if (layer.type === 'brush' || layer.type === 'select') {
+                    var id = layer.imageData;
+                    var data = id.data;
+                    var imgW = id.width;
+                    var clearX = layer.type === 'select' ? sx - Math.round(layer.x) : sx;
+                    var clearY = layer.type === 'select' ? sy - Math.round(layer.y) : sy;
+                    for (var py = 0; py < sh; py++) {
+                        for (var px = 0; px < sw; px++) {
+                            var lx = clearX + px;
+                            var ly = clearY + py;
+                            var lw = layer.type === 'select' ? layer.w : imgW;
+                            var lh = layer.type === 'select' ? layer.h : id.height;
+                            if (lx >= 0 && lx < lw && ly >= 0 && ly < lh) {
+                                var idx = (ly * lw + lx) * 4;
+                                data[idx + 3] = 0;
+                            }
+                        }
+                    }
+                } else if (layer.type !== 'brush') {
+                    var bounds = getLayerBounds(layer);
+                    if (bounds && bounds.x >= sx && bounds.y >= sy &&
+                        bounds.x + bounds.w <= sx + sw && bounds.y + bounds.h <= sy + sh) {
+                        layers.splice(i, 1);
+                        if (selectedLayerIndex === i) selectedLayerIndex = -1;
+                        else if (selectedLayerIndex > i) selectedLayerIndex--;
+                    }
+                }
+            }
+            render();
+            renderLayersPanel();
+            pushUndo();
+        };
+        newImg.src = newOrigCanvas.toDataURL();
+    }
+
+    // ── Perform selection (extract region from composite) ──
+    function performSelection(sx, sy, sw, sh) {
+        // Clamp to canvas bounds
+        if (sx < 0) { sw += sx; sx = 0; }
+        if (sy < 0) { sh += sy; sy = 0; }
+        if (sx + sw > canvas.width) sw = canvas.width - sx;
+        if (sy + sh > canvas.height) sh = canvas.height - sy;
+        if (sw <= 0 || sh <= 0) { render(); return; }
+
+        // 1. Flatten entire composite to extract the selected region
+        var compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = canvas.width;
+        compositeCanvas.height = canvas.height;
+        var compositeCtx = compositeCanvas.getContext('2d');
+        compositeCtx.drawImage(originalImage, 0, 0);
+        layers.forEach(function (layer) { drawLayer(compositeCtx, layer); });
+        var selectedPixels = compositeCtx.getImageData(sx, sy, sw, sh);
+
+        // 2. Punch a hole in the original image
+        var newOrigCanvas = document.createElement('canvas');
+        newOrigCanvas.width = originalImage.width || canvas.width;
+        newOrigCanvas.height = originalImage.height || canvas.height;
+        var newOrigCtx = newOrigCanvas.getContext('2d');
+        newOrigCtx.drawImage(originalImage, 0, 0);
+        newOrigCtx.clearRect(sx, sy, sw, sh);
+        var newImg = new Image();
+        newImg.onload = function () {
+            originalImage = newImg;
+
+            // 3. Clear the selected rect from all existing brush/select layers
+            for (var i = layers.length - 1; i >= 0; i--) {
+                var layer = layers[i];
+                if (layer.type === 'brush' || layer.type === 'select') {
+                    var id = layer.imageData;
+                    var data = id.data;
+                    var imgW = id.width;
+                    var clearX, clearY;
+                    if (layer.type === 'select') {
+                        clearX = sx - Math.round(layer.x);
+                        clearY = sy - Math.round(layer.y);
+                    } else {
+                        clearX = sx;
+                        clearY = sy;
+                    }
+                    for (var py = 0; py < sh; py++) {
+                        for (var px = 0; px < sw; px++) {
+                            var lx = clearX + px;
+                            var ly = clearY + py;
+                            if (lx >= 0 && lx < (layer.type === 'select' ? layer.w : imgW) &&
+                                ly >= 0 && ly < (layer.type === 'select' ? layer.h : id.height)) {
+                                var idx = ((ly) * imgW + lx) * 4;
+                                if (layer.type === 'select') {
+                                    idx = (ly * layer.w + lx) * 4;
+                                }
+                                data[idx + 3] = 0;
+                            }
+                        }
+                    }
+                } else if (layer.type !== 'brush') {
+                    var bounds = getLayerBounds(layer);
+                    if (bounds && bounds.x >= sx && bounds.y >= sy &&
+                        bounds.x + bounds.w <= sx + sw && bounds.y + bounds.h <= sy + sh) {
+                        layers.splice(i, 1);
+                        if (selectedLayerIndex === i) selectedLayerIndex = -1;
+                        else if (selectedLayerIndex > i) selectedLayerIndex--;
+                    }
+                }
+            }
+
+            // 4. Create the new select layer
+            layers.push({
+                type: 'select',
+                imageData: selectedPixels,
+                x: sx,
+                y: sy,
+                w: sw,
+                h: sh,
+            });
+            selectedLayerIndex = layers.length - 1;
+            render();
+            renderLayersPanel();
+            pushUndo();
+        };
+        newImg.src = newOrigCanvas.toDataURL();
     }
 
     // ── Hit testing ──
@@ -487,6 +738,15 @@
         }
 
         if (activeTool === 'select') {
+            // Check if clicking a resize handle on the pending selection
+            if (pendingSelect) {
+                var handle = hitTestResizeHandles(pos.x, pos.y);
+                if (handle) {
+                    resizeHandle = handle;
+                    resizeStart = { x: pos.x, y: pos.y, bounds: { x: pendingSelect.x, y: pendingSelect.y, w: pendingSelect.w, h: pendingSelect.h } };
+                    return;
+                }
+            }
             // Check if clicking on an existing select layer to drag it
             var hitIdx = hitTestLayers(pos.x, pos.y);
             if (hitIdx >= 0 && layers[hitIdx].type === 'select') {
@@ -496,12 +756,29 @@
                 render();
                 renderLayersPanel();
             } else {
-                // Start drawing a new selection rectangle
+                // Start drawing a new selection rectangle (clears any pending)
+                clearPendingSelect();
                 selectState = { startX: pos.x, startY: pos.y };
                 selectedLayerIndex = -1;
                 render();
                 renderLayersPanel();
             }
+            return;
+        }
+
+        if (activeTool === 'eyedropper') {
+            // Sample pixel colour from the composite canvas
+            var px = Math.round(pos.x);
+            var py = Math.round(pos.y);
+            if (px >= 0 && py >= 0 && px < canvas.width && py < canvas.height) {
+                var pixel = ctx.getImageData(px, py, 1, 1).data;
+                var hex = '#' + ((1 << 24) | (pixel[0] << 16) | (pixel[1] << 8) | pixel[2]).toString(16).slice(1);
+                colorPicker.value = hex;
+                textColorPicker.value = hex;
+                shapeColorPicker.value = hex;
+                fillToolColor.value = hex;
+            }
+            setTool(previousTool);
             return;
         }
 
@@ -592,6 +869,45 @@
             inpaintMaskCtx.stroke();
             lastX = pos.x;
             lastY = pos.y;
+            render();
+            return;
+        }
+
+        // Handle resize dragging on pending selection
+        if (resizeHandle && resizeStart && pendingSelect) {
+            var dx = pos.x - resizeStart.x;
+            var dy = pos.y - resizeStart.y;
+            var b = resizeStart.bounds;
+            var MIN_SIZE = 8;
+
+            if (resizeHandle === 'nw') {
+                pendingSelect.x = b.x + dx;
+                pendingSelect.y = b.y + dy;
+                pendingSelect.w = Math.max(MIN_SIZE, b.w - dx);
+                pendingSelect.h = Math.max(MIN_SIZE, b.h - dy);
+            } else if (resizeHandle === 'n') {
+                pendingSelect.y = b.y + dy;
+                pendingSelect.h = Math.max(MIN_SIZE, b.h - dy);
+            } else if (resizeHandle === 'ne') {
+                pendingSelect.y = b.y + dy;
+                pendingSelect.w = Math.max(MIN_SIZE, b.w + dx);
+                pendingSelect.h = Math.max(MIN_SIZE, b.h - dy);
+            } else if (resizeHandle === 'e') {
+                pendingSelect.w = Math.max(MIN_SIZE, b.w + dx);
+            } else if (resizeHandle === 'se') {
+                pendingSelect.w = Math.max(MIN_SIZE, b.w + dx);
+                pendingSelect.h = Math.max(MIN_SIZE, b.h + dy);
+            } else if (resizeHandle === 's') {
+                pendingSelect.h = Math.max(MIN_SIZE, b.h + dy);
+            } else if (resizeHandle === 'sw') {
+                pendingSelect.x = b.x + dx;
+                pendingSelect.w = Math.max(MIN_SIZE, b.w - dx);
+                pendingSelect.h = Math.max(MIN_SIZE, b.h + dy);
+            } else if (resizeHandle === 'w') {
+                pendingSelect.x = b.x + dx;
+                pendingSelect.w = Math.max(MIN_SIZE, b.w - dx);
+            }
+
             render();
             return;
         }
@@ -687,12 +1003,24 @@
 
     // Track mouse for shape creation on mouseup
     var lastMousePos = null;
+    var HANDLE_CURSORS = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
     canvas.addEventListener('mousemove', function (e) {
         lastMousePos = getCanvasPos(e);
+        // Update cursor for resize handles on pending selection
+        if (activeTool === 'select' && !isDrawing && !isDragging && !selectState && !resizeHandle) {
+            if (pendingSelect) {
+                var hoverHandle = hitTestResizeHandles(lastMousePos.x, lastMousePos.y);
+                if (hoverHandle) {
+                    canvas.style.cursor = HANDLE_CURSORS[hoverHandle];
+                    return;
+                }
+            }
+            canvas.style.cursor = 'crosshair';
+        }
     });
 
     canvas.addEventListener('mouseup', function (e) {
-        // Handle select tool completion
+        // Handle select tool completion — set pending selection (don't extract yet)
         if (activeTool === 'select' && selectState) {
             var pos = getCanvasPos(e);
             var sx = Math.round(Math.min(selectState.startX, pos.x));
@@ -711,85 +1039,15 @@
             if (sy + sh > canvas.height) sh = canvas.height - sy;
             if (sw <= 0 || sh <= 0) { render(); return; }
 
-            // 1. Flatten entire composite to extract the selected region
-            var compositeCanvas = document.createElement('canvas');
-            compositeCanvas.width = canvas.width;
-            compositeCanvas.height = canvas.height;
-            var compositeCtx = compositeCanvas.getContext('2d');
-            compositeCtx.drawImage(originalImage, 0, 0);
-            layers.forEach(function (layer) { drawLayer(compositeCtx, layer); });
-            var selectedPixels = compositeCtx.getImageData(sx, sy, sw, sh);
+            setPendingSelect(sx, sy, sw, sh);
+            return;
+        }
 
-            // 2. Punch a hole in the original image
-            var newOrigCanvas = document.createElement('canvas');
-            newOrigCanvas.width = originalImage.width || canvas.width;
-            newOrigCanvas.height = originalImage.height || canvas.height;
-            var newOrigCtx = newOrigCanvas.getContext('2d');
-            newOrigCtx.drawImage(originalImage, 0, 0);
-            newOrigCtx.clearRect(sx, sy, sw, sh);
-            var newImg = new Image();
-            newImg.onload = function () {
-                originalImage = newImg;
-
-                // 3. Clear the selected rect from all existing brush/select layers
-                for (var i = layers.length - 1; i >= 0; i--) {
-                    var layer = layers[i];
-                    if (layer.type === 'brush' || layer.type === 'select') {
-                        // Clear the region in the layer's ImageData
-                        var id = layer.imageData;
-                        var data = id.data;
-                        var imgW = id.width;
-                        // Determine the region to clear within this layer's pixel data
-                        var clearX, clearY;
-                        if (layer.type === 'select') {
-                            // select layers have an offset
-                            clearX = sx - Math.round(layer.x);
-                            clearY = sy - Math.round(layer.y);
-                        } else {
-                            clearX = sx;
-                            clearY = sy;
-                        }
-                        for (var py = 0; py < sh; py++) {
-                            for (var px = 0; px < sw; px++) {
-                                var lx = clearX + px;
-                                var ly = clearY + py;
-                                if (lx >= 0 && lx < (layer.type === 'select' ? layer.w : imgW) &&
-                                    ly >= 0 && ly < (layer.type === 'select' ? layer.h : id.height)) {
-                                    var idx = ((ly) * imgW + lx) * 4;
-                                    if (layer.type === 'select') {
-                                        idx = (ly * layer.w + lx) * 4;
-                                    }
-                                    data[idx + 3] = 0; // Set alpha to 0
-                                }
-                            }
-                        }
-                    } else if (layer.type !== 'brush') {
-                        // For vector layers, check if they're fully inside the selection
-                        var bounds = getLayerBounds(layer);
-                        if (bounds && bounds.x >= sx && bounds.y >= sy &&
-                            bounds.x + bounds.w <= sx + sw && bounds.y + bounds.h <= sy + sh) {
-                            layers.splice(i, 1);
-                            if (selectedLayerIndex === i) selectedLayerIndex = -1;
-                            else if (selectedLayerIndex > i) selectedLayerIndex--;
-                        }
-                    }
-                }
-
-                // 4. Create the new select layer
-                layers.push({
-                    type: 'select',
-                    imageData: selectedPixels,
-                    x: sx,
-                    y: sy,
-                    w: sw,
-                    h: sh,
-                });
-                selectedLayerIndex = layers.length - 1;
-                render();
-                renderLayersPanel();
-                pushUndo();
-            };
-            newImg.src = newOrigCanvas.toDataURL();
+        // Handle resize completion on pending selection
+        if (resizeHandle) {
+            resizeHandle = null;
+            resizeStart = null;
+            render();
             return;
         }
 

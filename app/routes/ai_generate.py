@@ -5,51 +5,18 @@ from datetime import datetime
 
 from flask import Blueprint, request, jsonify, send_from_directory, current_app
 
+from app.services.ai_client import get_client
+
 ai_generate_bp = Blueprint('ai_generate', __name__)
 
-MODELS_AI_STUDIO = [
+MODELS = [
     {'id': 'gemini-2.5-flash-image', 'name': 'Gemini 2.5 Flash Image (Fast)', 'default': True},
     {'id': 'gemini-3.1-flash-image-preview', 'name': 'Gemini 3.1 Flash Image (Latest)', 'default': False},
     {'id': 'gemini-3-pro-image-preview', 'name': 'Gemini 3 Pro Image (High Quality)', 'default': False},
 ]
 
-MODELS_VERTEX_AI = [
-    {'id': 'gemini-2.5-flash-image', 'name': 'Gemini 2.5 Flash Image (Fast)', 'default': True},
-    {'id': 'gemini-3.1-flash-image-preview', 'name': 'Gemini 3.1 Flash Image (Latest)', 'default': False},
-    {'id': 'gemini-3-pro-image-preview', 'name': 'Gemini 3 Pro Image (High Quality)', 'default': False},
-]
-
-
-def _is_vertex():
-    return bool(os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip())
-
-
-
+# Preview models are only available via the global endpoint
 VERTEX_GLOBAL_MODELS = {'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'}
-
-
-def _get_client(model_name=None):
-    from google import genai
-
-    # Prefer Vertex AI if configured, fall back to API key
-    gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-    gcp_location = os.environ.get('GOOGLE_CLOUD_LOCATION', 'global').strip()
-    api_key = os.environ.get('GEMINI_API_KEY', '').strip()
-
-    if gcp_project:
-        # Preview models are only available via the global endpoint
-        location = 'global' if model_name in VERTEX_GLOBAL_MODELS else gcp_location
-        client = genai.Client(vertexai=True, project=gcp_project, location=location)
-        return client, None
-
-    if api_key:
-        client = genai.Client(api_key=api_key)
-        return client, None
-
-    return None, (jsonify({
-        'error': 'No AI backend configured. Set GOOGLE_CLOUD_PROJECT (for Vertex AI) '
-                 'or GEMINI_API_KEY (for AI Studio) in docker-compose.yml.'
-    }), 500)
 
 
 def _session_dir(session_id):
@@ -260,8 +227,7 @@ def reset_prompts():
 
 @ai_generate_bp.route('/ai-generate/models', methods=['GET'])
 def list_models():
-    models = MODELS_VERTEX_AI if _is_vertex() else MODELS_AI_STUDIO
-    return jsonify({'models': models, 'backend': 'vertex_ai' if _is_vertex() else 'ai_studio'})
+    return jsonify({'models': MODELS})
 
 
 @ai_generate_bp.route('/ai-generate', methods=['POST'])
@@ -279,7 +245,8 @@ def generate():
         ref_files = []
         asset_id = data.get('asset_id', '')
 
-    client, err = _get_client(model_name)
+    location = 'global' if model_name in VERTEX_GLOBAL_MODELS else None
+    client, err = get_client(location=location)
     if err:
         return err
 
@@ -363,7 +330,8 @@ def refine():
     prompt = data.get('prompt', '').strip()
     model_name = data.get('model', 'gemini-2.5-flash-image')
 
-    client, err = _get_client(model_name)
+    location = 'global' if model_name in VERTEX_GLOBAL_MODELS else None
+    client, err = get_client(location=location)
     if err:
         return err
     reference_image = data.get('reference_image', '')

@@ -12,8 +12,7 @@ services:
     environment:
       - FLASK_DEBUG=1
       - MAX_UPLOAD_SIZE=500
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      # Vertex AI (optional — set GOOGLE_CLOUD_PROJECT to use instead of GEMINI_API_KEY)
+      # Vertex AI configuration (required)
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-us-central1}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/vertex-secret.json

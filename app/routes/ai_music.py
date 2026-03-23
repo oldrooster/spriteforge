@@ -7,11 +7,9 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify, send_from_directory, current_app
 
+from app.services.ai_client import get_vertex_config, get_credentials
+
 ai_music_bp = Blueprint('ai_music', __name__)
-
-
-def _is_vertex():
-    return bool(os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip())
 
 
 def _session_dir(output_folder, session_id):
@@ -38,17 +36,11 @@ def _write_status(session_dir, status_data):
 
 def _run_music_generation(session_dir, prompt, negative_prompt, project, location):
     """Background worker for Lyria music generation via Vertex AI REST."""
-    import google.auth
-    import google.auth.transport.requests
     import requests as http_requests
     import logging
 
     try:
-        credentials, _ = google.auth.default(
-            scopes=['https://www.googleapis.com/auth/cloud-platform']
-        )
-        auth_req = google.auth.transport.requests.Request()
-        credentials.refresh(auth_req)
+        credentials, auth_req = get_credentials()
 
         url = (
             f'https://{location}-aiplatform.googleapis.com/v1/'
@@ -115,10 +107,9 @@ def _run_music_generation(session_dir, prompt, negative_prompt, project, locatio
 
 @ai_music_bp.route('/ai-music', methods=['POST'])
 def generate():
-    if not _is_vertex():
-        return jsonify({
-            'error': 'AI Music requires Vertex AI. Set GOOGLE_CLOUD_PROJECT in docker-compose.yml.'
-        }), 400
+    cfg, err = get_vertex_config(location_env='GOOGLE_CLOUD_MUSIC_LOCATION')
+    if err:
+        return err
 
     data = request.get_json(force=True)
     prompt = data.get('prompt', '').strip()
@@ -138,16 +129,9 @@ def generate():
         'started': datetime.now(timezone.utc).isoformat(),
     })
 
-    gcp_project = os.environ.get('GOOGLE_CLOUD_PROJECT', '').strip()
-    # Lyria requires a regional endpoint, not global
-    gcp_location = os.environ.get('GOOGLE_CLOUD_MUSIC_LOCATION', '').strip()
-    if not gcp_location:
-        loc = os.environ.get('GOOGLE_CLOUD_LOCATION', '').strip()
-        gcp_location = loc if loc and loc != 'global' else 'us-central1'
-
     thread = threading.Thread(
         target=_run_music_generation,
-        args=(session_dir, prompt, negative_prompt, gcp_project, gcp_location),
+        args=(session_dir, prompt, negative_prompt, cfg['project'], cfg['location']),
         daemon=True,
     )
     thread.start()
