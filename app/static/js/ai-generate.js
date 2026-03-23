@@ -21,6 +21,13 @@
     const promptDropdown = document.getElementById('ai-generate-prompt-dropdown');
     const savePromptBtn = document.getElementById('ai-generate-save-prompt-btn');
 
+    const imageCountSlider = document.getElementById('ai-generate-count');
+    const imageCountDisplay = document.getElementById('ai-generate-count-display');
+
+    imageCountSlider.addEventListener('input', function () {
+        imageCountDisplay.textContent = imageCountSlider.value;
+    });
+
     let sessionId = null;
     let currentImageUrl = null;
     let history = [];
@@ -307,11 +314,13 @@
         errorEl.hidden = true;
 
         try {
+            var numImages = parseInt(imageCountSlider.value) || 1;
             var resp;
             if (referenceBlobs.length > 0) {
                 var formData = new FormData();
                 formData.append('prompt', promptText);
                 formData.append('model', modelSelect.value);
+                formData.append('number_of_images', numImages);
                 if (state.currentAssetId) formData.append('asset_id', state.currentAssetId);
                 referenceBlobs.forEach(function (blob, i) {
                     formData.append('reference_images', blob, 'reference_' + i + '.png');
@@ -328,6 +337,7 @@
                         prompt: promptText,
                         model: modelSelect.value,
                         asset_id: state.currentAssetId || '',
+                        number_of_images: numImages,
                     }),
                 });
             }
@@ -343,6 +353,12 @@
             actionsSection.hidden = false;
             emptyState.hidden = true;
             canvasWrap.hidden = false;
+
+            if (data.warnings && data.warnings.length > 0) {
+                var succeeded = history.length;
+                var requested = parseInt(imageCountSlider.value) || 1;
+                showError(succeeded + ' of ' + requested + ' images generated. ' + data.warnings.join('; '));
+            }
         } catch (err) {
             showError(err.message);
         } finally {
@@ -403,9 +419,10 @@
         historyStrip.innerHTML = '';
         history.forEach(function (entry, i) {
             var thumb = document.createElement('img');
-            thumb.src = '/api/ai-generate/image/' + sessionId + '/' + entry.image;
+            var src = '/api/ai-generate/image/' + sessionId + '/' + entry.image;
+            thumb.src = src;
             thumb.title = entry.prompt;
-            thumb.className = 'ai-history-thumb' + (i === history.length - 1 ? ' active' : '');
+            thumb.className = 'ai-history-thumb' + (src === currentImageUrl ? ' active' : '');
             thumb.addEventListener('click', function () {
                 displayImage(thumb.src);
                 currentImageUrl = thumb.src;

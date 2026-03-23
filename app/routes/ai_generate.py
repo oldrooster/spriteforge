@@ -238,12 +238,14 @@ def generate():
         model_name = request.form.get('model', 'gemini-2.5-flash-image')
         ref_files = request.files.getlist('reference_images')
         asset_id = request.form.get('asset_id', '')
+        number_of_images = min(int(request.form.get('number_of_images', 1)), 4)
     else:
         data = request.get_json(force=True)
         prompt = data.get('prompt', '').strip()
         model_name = data.get('model', 'gemini-2.5-flash-image')
         ref_files = []
         asset_id = data.get('asset_id', '')
+        number_of_images = min(int(data.get('number_of_images', 1)), 4)
 
     location = 'global' if model_name in VERTEX_GLOBAL_MODELS else None
     client, err = get_client(location=location)
@@ -269,55 +271,94 @@ def generate():
     try:
         from google.genai import types
         from PIL import Image
+        from concurrent.futures import ThreadPoolExecutor
 
-        # Build contents: prompt + optional reference images (up to 4)
-        contents = [prompt]
-        has_refs = False
+        # Save reference images to disk so each thread can open its own copy
+        ref_paths = []
         for i, ref_file in enumerate(ref_files[:4]):
             ref_path = os.path.join(session_dir, f'reference_{i}.png')
             ref_file.save(ref_path)
-            ref_img = Image.open(ref_path)
-            contents.append(ref_img)
-            has_refs = True
+            ref_paths.append(ref_path)
+        has_refs = len(ref_paths) > 0
 
-        if not has_refs:
-            contents = prompt
+        def _generate_one(idx):
+            # Each thread gets its own client and PIL images
+            thread_client, thread_err = get_client(location=location)
+            if thread_err:
+                raise RuntimeError('Failed to create client')
+            if has_refs:
+                thread_contents = [prompt] + [Image.open(p) for p in ref_paths]
+            else:
+                thread_contents = prompt
+            response = thread_client.models.generate_content(
+                model=model_name,
+                contents=thread_contents,
+                config=types.GenerateContentConfig(
+                    response_modalities=['IMAGE', 'TEXT'],
+                ),
+            )
+            for part in response.candidates[0].content.parts:
+                if part.inline_data and part.inline_data.mime_type.startswith('image/'):
+                    return part.inline_data.data
+            return None
 
-        response = client.models.generate_content(
-            model=model_name,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                response_modalities=['IMAGE', 'TEXT'],
-            ),
-        )
-        image_bytes = None
-        for part in response.candidates[0].content.parts:
-            if part.inline_data and part.inline_data.mime_type.startswith('image/'):
-                image_bytes = part.inline_data.data
-                break
-        if not image_bytes:
-            return jsonify({'error': 'No image in response. Try a different prompt.'}), 400
+        # Generate images in parallel with separate clients per thread
+        results = [None] * number_of_images
+        errors = []
+        if number_of_images == 1:
+            try:
+                results[0] = _generate_one(0)
+                if not results[0]:
+                    errors.append('Image 1: No image in response')
+            except Exception as gen_err:
+                errors.append(f'Image 1: {gen_err}')
+        else:
+            with ThreadPoolExecutor(max_workers=number_of_images) as executor:
+                futures = {executor.submit(_generate_one, i): i for i in range(number_of_images)}
+                for future in futures:
+                    idx = futures[future]
+                    try:
+                        img_bytes = future.result()
+                        if img_bytes:
+                            results[idx] = img_bytes
+                        else:
+                            errors.append(f'Image {idx + 1}: No image in response')
+                    except Exception as gen_err:
+                        errors.append(f'Image {idx + 1}: {gen_err}')
+        results = [r for r in results if r]
 
-        filename = 'generated_001.png'
-        filepath = os.path.join(session_dir, filename)
-        with open(filepath, 'wb') as f:
-            f.write(image_bytes)
+        if not results:
+            msg = errors[0] if errors else 'No image in response. Try a different prompt.'
+            return jsonify({'error': msg}), 400
 
-        history = [{
-            'prompt': prompt,
-            'image': filename,
-            'model': model_name,
-            'has_reference': has_refs,
-            'reference_count': len(ref_files[:4]),
-            'timestamp': datetime.utcnow().isoformat(),
-        }]
+        history = []
+        image_urls = []
+        for i, img_bytes in enumerate(results):
+            filename = f'generated_{i + 1:03d}.png'
+            filepath = os.path.join(session_dir, filename)
+            with open(filepath, 'wb') as f:
+                f.write(img_bytes)
+            url = f'/api/ai-generate/image/{session_id}/{filename}'
+            image_urls.append(url)
+            history.append({
+                'prompt': prompt,
+                'image': filename,
+                'model': model_name,
+                'has_reference': has_refs,
+                'reference_count': len(ref_files[:4]),
+                'timestamp': datetime.utcnow().isoformat(),
+            })
         _write_history(session_dir, history)
 
-        return jsonify({
+        resp = {
             'session_id': session_id,
-            'image_url': f'/api/ai-generate/image/{session_id}/{filename}',
+            'image_url': image_urls[0],
+            'image_urls': image_urls,
             'history': history,
-        })
+        }
+        if errors:
+            resp['warnings'] = errors
+        return jsonify(resp)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

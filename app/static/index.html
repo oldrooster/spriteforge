@@ -697,6 +697,13 @@
                             </div>
                             <button id="ai-generate-save-prompt-btn" class="btn btn-secondary btn-small" style="margin-top:6px;">Save Current Prompt</button>
                         </div>
+                        <div class="setting-group">
+                            <label>Number of Images</label>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="range" id="ai-generate-count" min="1" max="4" value="1" style="flex:1;">
+                                <span id="ai-generate-count-display" style="min-width:18px; text-align:center;">1</span>
+                            </div>
+                        </div>
                         <button id="ai-generate-btn" class="btn btn-primary" style="width:100%">Generate Sprite</button>
                         <div id="ai-generate-progress" class="progress-bar" hidden>
                             <div class="progress-fill indeterminate"></div>
