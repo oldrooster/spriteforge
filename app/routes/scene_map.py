@@ -272,11 +272,8 @@ def extract_style(asset_id):
     if not map_path or not os.path.exists(map_path):
         return jsonify({'error': 'Map image file not found'}), 404
 
-    data = request.get_json(force=True) if request.is_json else {}
-    model_name = data.get('model', 'gemini-2.5-flash-image')
-
-    location = 'global' if model_name in VERTEX_GLOBAL_MODELS else None
-    client, err = get_client(location=location)
+    # Use a text model (not an image-generation model) for style analysis
+    client, err = get_client()
     if err:
         return err
 
@@ -285,7 +282,7 @@ def extract_style(asset_id):
 
         map_img = Image.open(map_path)
         response = client.models.generate_content(
-            model=model_name,
+            model='gemini-2.5-flash',
             contents=[
                 'Analyze this image and describe its art style in detail for use as a style '
                 'reference prompt when generating new images in the same style. Focus on: '
@@ -294,9 +291,6 @@ def extract_style(asset_id):
                 'Output ONLY the style description as a concise prompt, nothing else.',
                 map_img,
             ],
-            config=types.GenerateContentConfig(
-                response_modalities=['TEXT'],
-            ),
         )
 
         style_text = ''
