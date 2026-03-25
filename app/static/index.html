@@ -1053,6 +1053,98 @@
                 </div>
             </div>
 
+            <!-- Tool: Scene Map Builder -->
+            <div class="tool-panel" id="tool-scene-map">
+                <div class="panel-back-bar">
+                    <button class="btn btn-secondary btn-small back-to-asset-btn" onclick="navigateBack()">&larr; Back</button>
+                    <span class="panel-title">Scene Map Builder</span>
+                </div>
+                <div class="ai-layout">
+                    <div class="ai-preview">
+                        <div class="scene-map-tabs">
+                            <button id="scene-map-tab-map" class="btn btn-secondary btn-small active">Map</button>
+                            <button id="scene-map-tab-location" class="btn btn-secondary btn-small">Location</button>
+                        </div>
+                        <div class="ai-canvas-wrap" id="scene-map-canvas-wrap" hidden>
+                            <canvas id="scene-map-canvas"></canvas>
+                        </div>
+                        <div id="scene-map-empty" class="dropzone" style="pointer-events:none;">
+                            <p>Upload or generate a map image to get started</p>
+                        </div>
+                    </div>
+                    <div class="ai-settings">
+                        <!-- Map settings (shown when no location selected) -->
+                        <div id="scene-map-settings-map">
+                            <div class="setting-group">
+                                <label>Model</label>
+                                <select id="scene-map-model" class="styled-select"></select>
+                            </div>
+                            <div class="setting-group">
+                                <label>Map Image</label>
+                                <div id="scene-map-map-thumb" class="scene-map-thumb-wrap" hidden></div>
+                                <div style="display:flex; gap:6px; margin-top:6px;">
+                                    <label class="btn btn-secondary btn-small" style="flex:1; text-align:center;">
+                                        Upload
+                                        <input type="file" id="scene-map-upload" accept=".png,.jpg,.jpeg,.webp" hidden>
+                                    </label>
+                                    <button id="scene-map-generate-map-btn" class="btn btn-secondary btn-small" style="flex:1;">Generate</button>
+                                </div>
+                                <div id="scene-map-generate-map-form" hidden style="margin-top:8px;">
+                                    <textarea id="scene-map-map-prompt" class="styled-textarea" rows="3"
+                                        placeholder="A top-down map of a tropical island with a beach, village, volcano, and jungle..."></textarea>
+                                    <button id="scene-map-map-go-btn" class="btn btn-primary btn-small" style="width:100%; margin-top:6px;">Generate Map</button>
+                                </div>
+                            </div>
+                            <div class="setting-group">
+                                <label>Art Style <span class="hint">(extracted or custom)</span></label>
+                                <textarea id="scene-map-style" class="styled-textarea" rows="3"
+                                    placeholder="Style will be extracted from map or enter manually..."></textarea>
+                                <button id="scene-map-extract-style-btn" class="btn btn-secondary btn-small" style="width:100%; margin-top:6px;">Extract from Map</button>
+                            </div>
+                            <hr>
+                            <div class="setting-group">
+                                <label>Locations</label>
+                                <div id="scene-map-location-list"></div>
+                                <button id="scene-map-add-location-btn" class="btn btn-secondary btn-small" style="width:100%; margin-top:6px;">+ Add Location</button>
+                            </div>
+                        </div>
+
+                        <!-- Location settings (shown when a location is selected) -->
+                        <div id="scene-map-settings-location" hidden>
+                            <button id="scene-map-back-to-map" class="btn btn-secondary btn-small" style="width:100%; margin-bottom:12px;">&larr; Back to Map</button>
+                            <div class="setting-group">
+                                <label>Location Name</label>
+                                <input type="text" id="scene-map-loc-name" class="styled-select" placeholder="Location name">
+                            </div>
+                            <div class="setting-group">
+                                <label>Background</label>
+                                <div id="scene-map-loc-thumb" class="scene-map-thumb-wrap" hidden></div>
+                                <span id="scene-map-loc-no-bg" class="hint">No background generated yet</span>
+                            </div>
+                            <div class="setting-group">
+                                <label>Model</label>
+                                <select id="scene-map-loc-model" class="styled-select"></select>
+                            </div>
+                            <div class="setting-group">
+                                <label>Prompt</label>
+                                <textarea id="scene-map-loc-prompt" class="styled-textarea" rows="5"
+                                    placeholder="A detailed point and click adventure game background..."></textarea>
+                            </div>
+                            <button id="scene-map-loc-generate-btn" class="btn btn-primary" style="width:100%">Generate Background</button>
+                            <div id="scene-map-loc-progress" class="progress-bar" hidden>
+                                <div class="progress-fill indeterminate"></div>
+                            </div>
+                            <div id="scene-map-loc-error" class="ai-error-msg" hidden></div>
+                        </div>
+
+                        <div id="scene-map-progress" class="progress-bar" hidden>
+                            <div class="progress-fill indeterminate"></div>
+                        </div>
+                        <div id="scene-map-error" class="ai-error-msg" hidden></div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -1262,5 +1354,6 @@
     <script src="/static/js/project-settings.js"></script>
     <script src="/static/js/markup.js"></script>
     <script src="/static/js/chat.js"></script>
+    <script src="/static/js/scene-map.js"></script>
 </body>
 </html>

@@ -3053,3 +3053,85 @@ hr {
     display: flex;
     gap: 4px;
 }
+
+/* ── Scene Map Builder ── */
+
+.scene-map-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.scene-map-tabs .btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.scene-map-thumb-wrap {
+    margin-bottom: 6px;
+}
+
+.scene-map-thumb-wrap img {
+    max-width: 100%;
+    border-radius: var(--radius);
+}
+
+.scene-map-location-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.scene-map-location-item:hover {
+    background: var(--bg-card);
+}
+
+.scene-map-location-item.active {
+    background: var(--bg-card);
+    border: 1px solid var(--accent);
+}
+
+.scene-map-loc-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.scene-map-loc-name {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scene-map-loc-remove {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.scene-map-location-item:hover .scene-map-loc-remove {
+    opacity: 1;
+}
+
+.scene-map-loc-remove:hover {
+    color: var(--accent);
+}
+
+#scene-map-canvas {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+}

@@ -60,6 +60,7 @@ const toolPanelMap = {
     'ai-animate': 'tool-ai-animate',
     'ai-music': 'tool-ai-music',
     'markup': 'tool-markup',
+    'scene-map': 'tool-scene-map',
 };
 
 function applyRoute() {

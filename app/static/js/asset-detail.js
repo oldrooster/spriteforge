@@ -75,6 +75,7 @@
                 null,
                 ['Generate Image', () => navigate('#/asset/' + id + '/tool/ai-generate')],
                 ['Generate Music', () => navigate('#/asset/' + id + '/tool/ai-music')],
+                ['Scene Map', () => navigate('#/asset/' + id + '/tool/scene-map')],
                 null,
                 ['Download', () => { window.open('/api/assets/' + id + '/download', '_blank'); }],
                 ['Export AGS', () => { window.open('/api/assets/' + id + '/export-ags', '_blank'); }],

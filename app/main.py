@@ -30,6 +30,7 @@ from app.routes.ai_music import ai_music_bp
 from app.routes.crop import crop_bp
 from app.routes.chat import chat_bp
 from app.routes.ai_inpaint import ai_inpaint_bp
+from app.routes.scene_map import scene_map_bp
 
 app.register_blueprint(upload_bp, url_prefix='/api')
 app.register_blueprint(extract_bp, url_prefix='/api')
@@ -43,6 +44,7 @@ app.register_blueprint(ai_music_bp, url_prefix='/api')
 app.register_blueprint(crop_bp, url_prefix='/api')
 app.register_blueprint(chat_bp, url_prefix='/api')
 app.register_blueprint(ai_inpaint_bp, url_prefix='/api')
+app.register_blueprint(scene_map_bp, url_prefix='/api')
 
 # Bootstrap default project on startup
 with app.app_context():
