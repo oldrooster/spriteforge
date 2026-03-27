@@ -9,8 +9,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download rembg u2net model so first use is instant
-RUN python -c "from rembg import remove; from PIL import Image; remove(Image.new('RGBA', (10, 10)))"
+# Pre-download rembg u2net model so first use is instant - BT Removed for portavlility on diff hardware
+# RUN python -c "from rembg import remove; from PIL import Image; remove(Image.new('RGBA', (10, 10)))"
 
 COPY app/ ./app/
 
